@@ -26,7 +26,9 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
 
 ENV HOME /home/mines
 WORKDIR "/home/mines/mines_ws"
-
 ENV DISPLAY=host.docker.internal:0.0
+
+# Copy in the bashrc file for convenience functions
+COPY .bashrc .
 
 CMD ["/bin/bash"]
