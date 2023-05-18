@@ -1,8 +1,11 @@
 devel/
 logs/
+log/
 build/
+install/
 bin/
 lib/
+.vscode/
 msg_gen/
 srv_gen/
 msg/*Action.msg
