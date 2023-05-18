@@ -29,6 +29,6 @@ WORKDIR "/home/mines/mines_ws"
 ENV DISPLAY=host.docker.internal:0.0
 
 # Copy in the bashrc file for convenience functions
-COPY .bashrc .
+COPY .bashrc /home/mines/.bashrc
 
 CMD ["/bin/bash"]
