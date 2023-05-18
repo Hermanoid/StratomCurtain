@@ -14,9 +14,17 @@ RUN apt update && apt install -y \
         lsb-release \
         gnupg
 
+# add gazebo 11 sources (Gazebo Classic, NOT Ignition/Garden)
+RUN sh -c 'echo "deb http://packages.osrfoundation.org/gazebo/ubuntu-stable `lsb_release -cs` main" > /etc/apt/sources.list.d/gazebo-stable.list'
+RUN wget https://packages.osrfoundation.org/gazebo.key -O - | sudo apt-key add -
+
 # install ros packages
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
-        ros-humble-demo-nodes-cpp \
+        gazebo \
+        libgazebo-dev\
+        ros-humble-turtlebot3 \
+        ros-humble-turtlebot3-msgs \
+        ros-humble-turtlebot3-simulations
 
 ENV HOME /home/mines
 WORKDIR "/home/mines/mines_ws"
