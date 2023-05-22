@@ -1,3 +1,5 @@
+# Note: This file was editted for stratom but largely based on 
+# a snippet from this author:
 # Author: Addison Sears-Collins
 # Date: September 23, 2021
 # Description: Load a world file into Gazebo.
@@ -56,6 +58,7 @@ def generate_launch_description():
     description='Full path to the world model file to load')
     
   # Specify the actions
+
    
   # Start Gazebo server
   start_gazebo_server_cmd = IncludeLaunchDescription(
