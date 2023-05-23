@@ -13,7 +13,7 @@ def generate_launch_description():
     pkg_share = FindPackageShare(package='stratom_sim').find('stratom_sim')
 
     # Get package share directory for turtlbot3 launch files
-    launch_file_dir = os.path.join(FindPackageShare(package='turtlebot3_gazebo').find('turtlebot3_gazebo'), 'launch')
+    launch_file_dir = os.path.join(pkg_share, 'launch')
 
     # Hardcode select the TURTLEBOT3_MODEL environment variable to waffle
     os.environ['TURTLEBOT3_MODEL'] = 'waffle'

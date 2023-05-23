@@ -1,5 +1,5 @@
 <?xml version="1.0" ?>
-<sdf version="1.4">
+<sdf version="1.5">
   <model name="turtlebot3_waffle">  
 
     <link name="base">
@@ -110,30 +110,47 @@
           </mesh>
         </geometry>
       </visual>
+<!-- 
+      <plugin name="p3d_base_controller" filename="libgazebo_ros_p3d.so">
+        <alwaysOn>true</alwaysOn>
+        <updateRate>50.0</updateRate>
+        <bodyName>base_link</bodyName>
+        <topicName>odom</topicName>
+        <gaussianNoise>0.01</gaussianNoise>
+        <frameName>world</frameName>
+        <xyzOffsets>0 0 0</xyzOffsets>
+        <rpyOffsets>0 0 0</rpyOffsets>
+      </plugin> -->
 
-      <sensor name="hls_lfcd_lds" type="ray">
+      <sensor name="hls_lfcd_lds" type="gpu_ray">
         <always_on>1</always_on>
         <visualize>0</visualize>
         <pose>-0.064 0 0.121 0 0 0</pose>
-        <update_rate>1800</update_rate>
+        <update_rate>15</update_rate>
         <ray>
           <scan>
             <horizontal>
+            <!-- the SICK lidar has 0.33 degree resolution, so 360/0.33= 1080 samples/scan
+              For efficiency reasons, do only 360 raycasts and use the resolution feature to interpolate to 1080 -->
               <samples>360</samples>
-              <resolution>1.000000</resolution>
+              <resolution>3.000000</resolution>
               <min_angle>0.000000</min_angle>
               <max_angle>6.280000</max_angle>
             </horizontal>
           </scan>
           <range>
-            <min>0.120000</min>
-            <max>3.5</max>
+            <min>0.05</min>
+            <max>25</max>
             <resolution>0.015000</resolution>
           </range>
           <noise>
             <type>gaussian</type>
+            <!-- Note: The "mean" here represents systematic error,
+            Which the SICK sensor is rated to have +-60mm of.
+             It might be wise to simulate it in the future. -->
             <mean>0.0</mean>
-            <stddev>0.01</stddev>
+            <!-- The SICK sensor is also rated to have up to 20mm of random noise in non-ideal conditions -->
+            <stddev>0.02</stddev>
           </noise>
         </ray>
       </sensor>
