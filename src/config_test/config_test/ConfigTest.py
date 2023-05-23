@@ -19,7 +19,10 @@ class ConfigTest(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = ConfigTest()
-    rclpy.spin(node)
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
     rclpy.shutdown()
 
 if __name__ == '__main__':

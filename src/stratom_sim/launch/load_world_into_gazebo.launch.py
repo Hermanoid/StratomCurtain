@@ -23,7 +23,7 @@ def generate_launch_description():
   pkg_share = FindPackageShare(package='stratom_sim').find('stratom_sim')
  
   # Set the path to the world file
-  world_file_name = 'factory.world'
+  world_file_name = 'factory'
   world_path = os.path.join(pkg_share, 'worlds', world_file_name)
    
   # Set the path to the SDF model files.

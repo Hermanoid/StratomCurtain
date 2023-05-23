@@ -62,6 +62,16 @@ def generate_launch_description():
         output='screen',
     )
 
+    # Add odom_tf2_adapter node to convert ground-truth simulation pose information to tf transform
+    # This node basically says "Take the position from the simulation and use it directly"
+    odom_tf2_adapter_node = Node(
+        package='odom_tf2_adapter',
+        executable='odom_tf2_adapter',
+        name='odom_tf2_adapter',
+        parameters=[{"odom_topic": "/odom",
+                     "base_frame": "base_footprint",
+                     "parent_frame": "odom"}]
+    )
     
 
     ld = LaunchDescription()
@@ -73,12 +83,7 @@ def generate_launch_description():
     # Add any conditioned actions
     ld.add_action(start_gazebo_ros_spawner_cmd)
 
-    # Testy stuffs
-    config_test = Node(
-        package='config_test',
-        executable='config_test',
-        output='screen',
-        parameters=[{"test_param": urdf_path}]
-    )
+    # Add the nodes to launch
+    ld.add_action(odom_tf2_adapter_node)
 
     return ld
