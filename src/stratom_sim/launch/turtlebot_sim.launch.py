@@ -62,16 +62,5 @@ def generate_launch_description():
     ld.add_action(load_world)
     ld.add_action(robot_state_publisher_cmd)
     ld.add_action(spawn_turtlebot_cmd)
-
-    # Testy stuff
-    config_test_pkg = FindPackageShare(package='config_test').find('config_test')
-    config_test_launch = Node(
-        package='config_test',
-        executable='config_test',
-        name='config_test',
-        output='screen',
-        parameters=[{'test_param': PathJoinSubstitution([worlds_path, world])}]
-    )
-    ld.add_action(config_test_launch)
-
+    
     return ld
