@@ -24,7 +24,12 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
         libgazebo-dev\
         ros-humble-turtlebot3 \
         ros-humble-turtlebot3-msgs \
-        ros-humble-turtlebot3-simulations
+        ros-humble-turtlebot3-simulations \
+        python3-pip
+
+# Downgrade setuptools because ROS
+# (Basically, this image was built for Humble, which uses a newer version of Python and yet they have not updated the way that they build Python nodes)
+RUN pip3 install setuptools==58.2.0
 
 ENV HOME /home/mines
 WORKDIR "/home/mines/mines_ws"
@@ -32,5 +37,10 @@ ENV DISPLAY=host.docker.internal:0.0
 
 # Copy in the bashrc file for convenience functions
 COPY .bashrc /home/mines/.bashrc
+
+# Since the workdir is already set to the volume with repo files, no need to copy those in.
+# Just build the workspace
+RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
+                  colcon build --symlink-install"
 
 CMD ["/bin/bash"]

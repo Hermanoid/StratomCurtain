@@ -56,8 +56,6 @@ def generate_launch_description():
     name='world',
     default_value=world_path,
     description='Full path to the world model file to load')
-    
-  # Specify the actions
 
    
   # Start Gazebo server

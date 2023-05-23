@@ -4,7 +4,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, LaunchConfiguration, PythonExpression
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -24,18 +24,18 @@ def generate_launch_description():
     world = LaunchConfiguration('world')
 
     default_world = "factory.world"
-    world_path = os.path.join(pkg_share, 'worlds', default_world)
+    worlds_path = os.path.join(pkg_share, 'worlds')
 
     # Declare the launch arguments
     declare_world_cmd = DeclareLaunchArgument(
-    name='world',
-    default_value=world_path,
-    description='Full path to the world model file to load')
+        name='world',
+        default_value=default_world,
+        description='Full path to the world model file to load')
 
     # create a launch config variable that includes the load_world_into_gazebo.launch.py file
     load_world = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(pkg_share, 'launch', 'load_world_into_gazebo.launch.py')),
-        launch_arguments={'world': world}.items()
+        launch_arguments={'world': PathJoinSubstitution([worlds_path, world])}.items()
     )
 
     robot_state_publisher_cmd = IncludeLaunchDescription(
@@ -62,5 +62,16 @@ def generate_launch_description():
     ld.add_action(load_world)
     ld.add_action(robot_state_publisher_cmd)
     ld.add_action(spawn_turtlebot_cmd)
+
+    # Testy stuff
+    config_test_pkg = FindPackageShare(package='config_test').find('config_test')
+    config_test_launch = Node(
+        package='config_test',
+        executable='config_test',
+        name='config_test',
+        output='screen',
+        parameters=[{'test_param': PathJoinSubstitution([worlds_path, world])}]
+    )
+    ld.add_action(config_test_launch)
 
     return ld
