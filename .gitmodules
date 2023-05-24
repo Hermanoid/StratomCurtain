@@ -1,0 +1,3 @@
+[submodule "src/costmap_converter"]
+	path = src/costmap_converter
+	url = git@github.com:Hermanoid/costmap_converter.git
