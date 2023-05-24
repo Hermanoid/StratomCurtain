@@ -25,7 +25,9 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
         ros-humble-turtlebot3 \
         ros-humble-turtlebot3-msgs \
         ros-humble-turtlebot3-simulations \
-        python3-pip
+        python3-pip \
+        ros-humble-navigation2 \
+        sudo apt install ros-humble-nav2-bringup
 
 # Downgrade setuptools because ROS
 # (Basically, this image was built for Humble, which uses a newer version of Python and yet they have not updated the way that they build Python nodes)
