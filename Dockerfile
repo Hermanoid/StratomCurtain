@@ -27,7 +27,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
         ros-humble-turtlebot3-simulations \
         python3-pip \
         ros-humble-navigation2 \
-        sudo apt install ros-humble-nav2-bringup
+        ros-humble-nav2-bringup
 
 # Downgrade setuptools because ROS
 # (Basically, this image was built for Humble, which uses a newer version of Python and yet they have not updated the way that they build Python nodes)
@@ -43,6 +43,6 @@ COPY .bashrc /home/mines/.bashrc
 # Since the workdir is already set to the volume with repo files, no need to copy those in.
 # Just build the workspace
 RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
-                  colcon build --symlink-install"
+        colcon build --symlink-install"
 
 CMD ["/bin/bash"]
