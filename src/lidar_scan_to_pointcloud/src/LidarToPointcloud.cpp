@@ -46,7 +46,7 @@ private:
     // Convert the Point Cloud to sensor_msgs::msg::PointCloud2
     sensor_msgs::msg::PointCloud2::SharedPtr cloudMsg(new sensor_msgs::msg::PointCloud2);
     pcl::toROSMsg(*pointCloud, *cloudMsg);
-    cloudMsg->header.frame_id = "base_scan";  // Set the frame ID
+    cloudMsg->header = msg->header;
 
     // Publish the Point Cloud
     pointCloudPublisher_->publish(*cloudMsg);

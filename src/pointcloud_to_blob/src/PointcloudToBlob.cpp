@@ -1,8 +1,11 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <geometry_msgs/msg/polygon.hpp>
+#include <geometry_msgs/msg/polygon_stamped.hpp>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_types.h>
 #include <pcl/segmentation/extract_clusters.h>
+#include <pcl/surface/concave_hull.h>
 
 class BlobExtractionNode : public rclcpp::Node{
 
@@ -11,11 +14,9 @@ public:
   BlobExtractionNode() : Node("blob_extraction_node"){
 
     subscription_ = create_subscription<sensor_msgs::msg::PointCloud2>("point_cloud", 10, std::bind(&BlobExtractionNode::pointCloudCallback, this, std::placeholders::_1));
-    clusterPublishers_.resize(maxClusters_);
-    for (int i = 0; i < maxClusters_; ++i){
-      std::string topicName = "cluster_" + std::to_string(i);
-      clusterPublishers_[i] = create_publisher<sensor_msgs::msg::PointCloud2>(topicName, 10);
-    }
+    polygon_pub_ = create_publisher<geometry_msgs::msg::PolygonStamped>("cluster_polygon", 10);
+    declare_parameter<int>("convex_alpha", 0.5);
+    declare_parameter<int>("polygon_select", 0);
   }
 
 private:
@@ -36,26 +37,46 @@ private:
     euclideanCluster.setInputCloud(pclCloud);
     euclideanCluster.extract(clusterIndices);
 
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cluster(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_hull (new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::ConcaveHull<pcl::PointXYZ> chull;
+    double alpha = get_parameter("convex_alpha").as_double();
+    chull.setAlpha (alpha);
+    size_t polygon_select = (int)get_parameter("polygon_select").as_int();
     // Process each cluster
-    for (int i = 0; i < clusterIndices.size() && i < maxClusters_; ++i)
+    for (size_t i = 0; i < clusterIndices.size() && i < maxClusters_; ++i)
     {
-      pcl::PointCloud<pcl::PointXYZ>::Ptr cluster(new pcl::PointCloud<pcl::PointXYZ>);
+      cluster.reset(new pcl::PointCloud<pcl::PointXYZ>);
       for (const auto& index : clusterIndices[i].indices)
       {
         cluster->push_back(pclCloud->points[index]);
       }
 
-      // Convert the cluster to PointCloud2 message
-      sensor_msgs::msg::PointCloud2::SharedPtr clusterMsg(new sensor_msgs::msg::PointCloud2);
-      pcl::toROSMsg(*cluster, *clusterMsg);
-      clusterMsg->header = msg->header;
+      chull.setInputCloud (cluster);
+      chull.reconstruct (*cloud_hull);
 
-      // Publish the cluster on a new topic
-      clusterPublishers_[i]->publish(*clusterMsg);
+      geometry_msgs::msg::Polygon polygon;
+      polygon.points = std::vector<geometry_msgs::msg::Point32>();
+      for(const auto& point : cloud_hull->points){
+        geometry_msgs::msg::Point32 p;
+        p.x = point.x;
+        p.y = point.y;
+        p.z = point.z;
+        polygon.points.push_back(p);
+      }
+
+      geometry_msgs::msg::PolygonStamped polygonStamped;
+      polygonStamped.header = msg->header;
+      polygonStamped.polygon = polygon;
+
+      if(polygon_select == i){
+      polygon_pub_->publish(polygonStamped);
+
+      }
     }
   }
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subscription_;
-  std::vector<rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr> clusterPublishers_;
+  rclcpp::Publisher<geometry_msgs::msg::PolygonStamped>::SharedPtr polygon_pub_;
   const int maxClusters_ = 10; // Maximum number of clusters to publish
 };
 
