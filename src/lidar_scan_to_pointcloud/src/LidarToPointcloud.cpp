@@ -1,6 +1,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+#include <pcl/common/point_tests.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
@@ -30,9 +31,11 @@ private:
 
     // Populate the Point Cloud with LiDAR data
     for (size_t i = 0; i < msg->ranges.size(); ++i){
-
       // Convert polar coordinates to Cartesian coordinates
       float range = msg->ranges[i];
+      if(std::isinf(range) || std::isnan(range)){
+        continue;
+      }
       float angle = msg->angle_min + i * msg->angle_increment;
 
       pointCloud->points[i].x = range * cos(angle);
