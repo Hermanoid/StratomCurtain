@@ -12,12 +12,15 @@ find_package(sensor_msgs REQUIRED)
 find_package(stratom_msgs REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(pcl_ros REQUIRED)
+find_package(visualization_msgs REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_executable(pointcloud_to_blob src/pointcloud_to_blob.cpp)
-ament_target_dependencies(pointcloud_to_blob rclcpp sensor_msgs pcl_conversions pcl_ros stratom_msgs)
+
+add_executable(PointcloudToBlob src/PointcloudToBlob.cpp)
+ament_target_dependencies(PointcloudToBlob rclcpp sensor_msgs pcl_conversions pcl_ros visualization_msgs stratom_msgs)
+
 
 target_include_directories(pointcloud_to_blob PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
