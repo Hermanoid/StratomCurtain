@@ -15,16 +15,16 @@ find_package(pcl_ros REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_executable(lidar_to_pointcloud src/lidar_to_pointcloud.cpp)
+add_executable(LidarToPointcloud src/LidarToPointcloud.cpp)
 
-ament_target_dependencies(lidar_to_pointcloud rclcpp sensor_msgs pcl_conversions pcl_ros)
+ament_target_dependencies(LidarToPointcloud rclcpp sensor_msgs pcl_conversions pcl_ros)
 
-target_include_directories(lidar_to_pointcloud PUBLIC
+target_include_directories(LidarToPointcloud PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_compile_features(lidar_to_pointcloud PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_compile_features(LidarToPointcloud PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
-install(TARGETS lidar_to_pointcloud
+install(TARGETS LidarToPointcloud
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
