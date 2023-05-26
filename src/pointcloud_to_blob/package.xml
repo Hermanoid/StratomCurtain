@@ -8,9 +8,11 @@
   <license>Apache License 2.0</license>
 
   <exec_depend>rclcpp</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>pcl_conversions</exec_depend>
   <exec_depend>pcl_ros</exec_depend>
+
+  <depend>sensor_msgs</depend>
+  <depend>stratom_msgs</depend>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

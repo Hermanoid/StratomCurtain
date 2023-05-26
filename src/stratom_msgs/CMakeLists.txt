@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(lidar_scan_to_pointcloud)
+project(stratom_msgs)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -7,25 +7,14 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(pcl_conversions REQUIRED)
-find_package(pcl_ros REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_executable(lidar_to_pointcloud src/lidar_to_pointcloud.cpp)
-
-ament_target_dependencies(lidar_to_pointcloud rclcpp sensor_msgs pcl_conversions pcl_ros)
-
-target_include_directories(lidar_to_pointcloud PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_compile_features(lidar_to_pointcloud PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-
-install(TARGETS lidar_to_pointcloud
-  DESTINATION lib/${PROJECT_NAME})
+include_directories(${geometry_msgs_INCLUDE_DIRS} ${std_msgs_INCLUDE_DIRS})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -38,5 +27,9 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/PolygonArray.msg"
+ )
 
 ament_package()
