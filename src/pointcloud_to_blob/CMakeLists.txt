@@ -9,21 +9,22 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(stratom_msgs REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(pcl_ros REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_executable(PointcloudToBlob src/PointcloudToBlob.cpp)
-ament_target_dependencies(PointcloudToBlob rclcpp sensor_msgs pcl_conversions pcl_ros)
+add_executable(pointcloud_to_blob src/pointcloud_to_blob.cpp)
+ament_target_dependencies(pointcloud_to_blob rclcpp sensor_msgs pcl_conversions pcl_ros stratom_msgs)
 
-target_include_directories(PointcloudToBlob PUBLIC
+target_include_directories(pointcloud_to_blob PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_compile_features(PointcloudToBlob PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_compile_features(pointcloud_to_blob PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
-install(TARGETS PointcloudToBlob
+install(TARGETS pointcloud_to_blob
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
