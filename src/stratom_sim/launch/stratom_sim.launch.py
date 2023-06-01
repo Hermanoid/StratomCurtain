@@ -32,7 +32,7 @@ def generate_launch_description():
         name="world", default_value=default_world, description="Full path to the world model file to load"
     )
 
-    # create a launch config variable that includes the load_world_into_gazebo.launch.py file
+    # # create a launch config variable that includes the load_world_into_gazebo.launch.py file
     load_world = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(pkg_share, "launch", "load_world_into_gazebo.launch.py")),
         launch_arguments={"world": PathJoinSubstitution([worlds_path, world])}.items(),

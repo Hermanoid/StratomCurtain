@@ -23,7 +23,7 @@ find_package(ament_cmake REQUIRED)
 #   ament_lint_auto_find_test_dependencies()
 # endif()
 install(DIRECTORY launch
-  # configs
+  config
   # maps
   worlds
   # robots
