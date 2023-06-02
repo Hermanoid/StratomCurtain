@@ -37,5 +37,10 @@ converter_costmap:
       always_send_full_costmap: True
 
 costmap_converter:
+  intra_node:
+    ros__parameters:
+      min_distance_between_blobs: 100
+      alpha_slow: 0.1
+      alpha_fast: 0.6
   ros__parameters:
     converter_plugin: costmap_converter::CostmapToDynamicObstacles
