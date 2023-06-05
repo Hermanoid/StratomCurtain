@@ -3,8 +3,9 @@ from shapely import LineString, MultiPoint, Polygon
 import numpy as np
 from rclpy.node import Node
 from collections import OrderedDict
-from costmap_converter_msgs.msg import ObstacleArrayMsg
+from costmap_converter_msgs.msg import ObstacleArrayMsg, ObstacleMsg
 from scipy.spatial import distance as dist
+from typing import List
 
 class PyTracker(Node):
    
@@ -22,14 +23,14 @@ class PyTracker(Node):
         self.maxDisappeared = 50
 
         #Create the subscription to the topic
-        self.subscription = self.create_subscription(
+        self.create_subscription(
             ObstacleArrayMsg,
             'converter_obstacles',
             self.listener_callback,
             10
         )
 
-        self.subscription2 = self.create_subscription( TFMessage, 'tf', self.tf_callback, 10)
+        self.create_subscription( TFMessage, 'tf', self.tf_callback, 10)
 
 
     def register(self, centroid):
@@ -41,8 +42,8 @@ class PyTracker(Node):
         del self.objects[objectID]
         del self.disappeared[objectID]
 
-    def update(self, polygons):
-        if(len(polygons) == 0):
+    def update(self, inputCentroids):
+        if(len(inputCentroids) == 0):
             for objectID in list(self.disappeared.keys()):
                 self.disappeared[objectID] += 1
 
@@ -51,12 +52,6 @@ class PyTracker(Node):
             
             return self.objects
         
-        #Create array of centroids from polygons
-        inputCentroids = []
-
-        for i in enumerate(polygons):
-            center = polygons[i].centroid
-            inputCentroids[i] = center
 
         if len(self.objects) == 0:
             for i in range(0, len(inputCentroids)):
@@ -108,11 +103,13 @@ class PyTracker(Node):
 
     
     def listener_callback(self,msg:ObstacleArrayMsg):
-        obsArr = msg.obstacles
-        polygons = []
-        for i in len(obsArr):
-            polygons.append((obsArr[i].polygon.centroid.x, obsArr[i].polygon.centroid.y))
-        self.update(polygons)
+        obsArr: List[ObstacleMsg] = list(msg.obstacles)
+        centroids = []
+        for obstacle in obsArr:
+            points = [(point.x, point.y) for point in obstacle.polygon.points]
+            centroid = Polygon(shell= points).centroid
+            centroids.append((centroid.x, centroid.y))
+        self.update(centroids)
 
 def main(args=None):
     #unsure about this
