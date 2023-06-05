@@ -50,7 +50,7 @@ class PyTracker(Node):
         inputCentroids = []
 
         for i in enumerate(polygons):
-            center = polygons[i].centroid
+            center = polygons[i]
             inputCentroids[i] = center
 
         if len(self.objects) == 0:
@@ -101,7 +101,7 @@ class PyTracker(Node):
         obsArr = msg.obstacles
         polygons = []
         for i in len(obsArr):
-            polygons.append(obsArr[i].polygon)
+            polygons.append((obsArr[i].polygon.centroid.x, obsArr[i].polygon.centroid.y))
         
         self.update(polygons)
 

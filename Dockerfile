@@ -31,7 +31,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
 
 # Downgrade setuptools because ROS
 # (Basically, this image was built for Humble, which uses a newer version of Python and yet they have not updated the way that they build Python nodes)
-RUN pip3 install setuptools==58.2.0
+RUN pip3 install setuptools==58.2.0 shapely
 
 ENV HOME /home/mines
 WORKDIR "/home/mines/mines_ws"
