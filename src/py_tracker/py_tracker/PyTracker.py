@@ -9,7 +9,7 @@ from scipy.spatial import distance as dist
 class PyTracker(Node):
    
     def __init__(self):
-        super().__init__('py_tracker_node')
+        super().__init__('py_tracker_node', parameter_overrides=[])
 
         #ID to assign to the object, dictionary to keep track of mapped objects ID to centroid, number of consecutive frames marked dissapeeared
         self.nextObjectID = 1; 
@@ -97,12 +97,11 @@ class PyTracker(Node):
 
             return self.objects
     
-    def listener_callback(self,msg):
+    def listener_callback(self,msg:ObstacleArrayMsg):
         obsArr = msg.obstacles
         polygons = []
         for i in len(obsArr):
-            polygons.append(obsArr[i].polygon)
-        
+            polygons.append((obsArr[i].polygon.centroid.x, obsArr[i].polygon.centroid.y))
         self.update(polygons)
 
 
