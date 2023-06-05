@@ -1,5 +1,5 @@
 import rclpy
-from shapely import LineString, MultiPoint, Polygon
+from shapely import Polygon
 import numpy as np
 from rclpy.node import Node
 from collections import OrderedDict
@@ -25,13 +25,10 @@ class PyTracker(Node):
         #Create the subscription to the topic
         self.create_subscription(
             ObstacleArrayMsg,
-            'converter_obstacles',
+            'costmap_obstacles',
             self.listener_callback,
             10
         )
-
-        self.create_subscription( TFMessage, 'tf', self.tf_callback, 10)
-
 
     def register(self, centroid):
         self.objects[self.nextObjectID] = centroid
@@ -44,7 +41,7 @@ class PyTracker(Node):
 
     def update(self, inputCentroids):
         if(len(inputCentroids) == 0):
-            for objectID in list(self.disappeared.keys()):
+            for objectID in self.disappeared.keys():
                 self.disappeared[objectID] += 1
 
                 if self.disappeared[objectID] > self.maxDisappeared:
@@ -54,8 +51,8 @@ class PyTracker(Node):
         
 
         if len(self.objects) == 0:
-            for i in range(0, len(inputCentroids)):
-                self.register(inputCentroids[i])
+            for centroid in inputCentroids:
+                self.register(centroid)
 
         else:
             objectIDs = list(self.objects.keys())
@@ -96,11 +93,6 @@ class PyTracker(Node):
                     self.register(inputCentroids[col])
 
             return self.objects
-        
-    def tf_callback(self, msg):
-        robot_x = msg.transform.x
-        robot_y = msg.transform.y
-
     
     def listener_callback(self,msg:ObstacleArrayMsg):
         obsArr: List[ObstacleMsg] = list(msg.obstacles)
@@ -112,17 +104,14 @@ class PyTracker(Node):
         self.update(centroids)
 
 def main(args=None):
-    #unsure about this
     rclpy.init(args=args)
-    #
-    
-    py_tracker_node = PyTracker()
-    rclpy.spin(py_tracker_node)
-    py_tracker_node.destroy_node()
+    try:
+        py_tracker_node = PyTracker()
+        rclpy.spin(py_tracker_node)
+    except KeyboardInterrupt:
+        print("PyTracker was terminated by a KeyboardInterrupt")
 
-    #unsure about this
     rclpy.shutdown()
-    #
 
 if __name__ == '__main__':
     main()
