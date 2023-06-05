@@ -15,6 +15,8 @@ class PyTracker(Node):
         self.nextObjectID = 1; 
         self.objects = OrderedDict()
         self.disappeared = OrderedDict()
+        self.robot_x = 0
+        self.robot_y = 0
 
         #Maximum number of frames the object can be undetectable for
         self.maxDisappeared = 50
@@ -27,6 +29,9 @@ class PyTracker(Node):
             10
         )
 
+        self.subscription2 = self.create_subscription( TFMessage, 'tf', self.tf_callback, 10)
+
+
     def register(self, centroid):
         self.objects[self.nextObjectID] = centroid
         self.disappeared[self.nextObjectID] = 0
@@ -37,7 +42,7 @@ class PyTracker(Node):
         del self.disappeared[objectID]
 
     def update(self, polygons):
-        if(len(polygons)):
+        if(len(polygons) == 0):
             for objectID in list(self.disappeared.keys()):
                 self.disappeared[objectID] += 1
 
@@ -96,7 +101,14 @@ class PyTracker(Node):
                     self.register(inputCentroids[col])
 
             return self.objects
+        
+    def tf_callback(self, msg):
+        robot_x = msg.transform.x
+        robot_y = msg.transform.y
+
     
+            
+
     def listener_callback(self,msg):
         obsArr = msg.obstacles
         polygons = []
@@ -104,7 +116,6 @@ class PyTracker(Node):
             polygons.append(obsArr[i].polygon)
         
         self.update(polygons)
-
 
 def main(args=None):
     #unsure about this
