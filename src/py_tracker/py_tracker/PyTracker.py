@@ -121,7 +121,6 @@ class PyTracker(Node):
     
     def listener_callback(self,msg:ObstacleArrayMsg):
         obsArr: List[ObstacleMsg] = list(msg.obstacles)
-<<<<<<< HEAD
         #Gets the centroids and points from the polygons in the input message
         polygons = []
         bad_points = []
