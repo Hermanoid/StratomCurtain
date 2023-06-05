@@ -4,6 +4,7 @@ import numpy as np
 from rclpy.node import Node
 from collections import OrderedDict
 from costmap_converter_msgs.msg import ObstacleArrayMsg, ObstacleMsg
+from py_tracker_msg import PyTrackerArrayMsg, PyTrackerMsg
 from scipy.spatial import distance as dist
 from typing import List
 import cv2
@@ -15,7 +16,8 @@ class PyTracker(Node):
    
     def __init__(self):
         super().__init__('py_tracker_node', parameter_overrides=[])
-
+        #Message array CHECK!
+        self.msg = PyTrackerArrayMsg()
         #ID to assign to the object, dictionary to keep track of mapped objects ID to centroid, number of consecutive frames marked dissapeeared
         self.nextObjectID = 1; 
         self.objects: OrderedDict[int, Polygon] = OrderedDict()
@@ -33,6 +35,12 @@ class PyTracker(Node):
             self.listener_callback,
             10
         )
+        #Create a publisher to a topic (be able to change topic name?)
+        self.publisher_ = self.create_publisher(
+            PyTrackerArrayMsg, 
+            'warning_messages', 
+            10
+        )
 
     def register(self, polygon):
         self.objects[self.nextObjectID] = polygon
@@ -42,6 +50,17 @@ class PyTracker(Node):
     def deregister(self, objectID):
         del self.objects[objectID]
         del self.disappeared[objectID]
+    
+    #create individual objects, add to message array. Update parameters as needed CHECK!
+    def create_object_msg(self):
+        cur_object = PyTrackerMsg()
+        # populate object fields ...
+        # Add object to msg array 
+        self.msg.warnings.append(cur_object)
+    
+    #called seperately to publish entire array to topic '/warning_messages' CHECK!
+    def publish(self):
+        self.publisher_.publish(self.msg)
 
     def update(self, inputPolygons: List[Polygon]):
         if(len(inputPolygons) == 0):
