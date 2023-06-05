@@ -7,7 +7,7 @@ float32 min_angle
 #Specifies the maximum angle detected fom the polygon
 float32 max_angle
 
-#Time stamp 
+#Time stamp, (could be time timestamp)
 time stamp
 
 #Frame ID
