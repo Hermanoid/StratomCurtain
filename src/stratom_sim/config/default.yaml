@@ -1,0 +1,46 @@
+converter_costmap:
+  converter_costmap:
+    ros__parameters:
+      update_frequency: 6.0
+      publish_frequency: 2.0
+      global_frame: odom
+      robot_base_frame: base_link
+      rolling_window: true
+      width: 20
+      height: 20
+      resolution: 0.1
+      robot_radius: 0.22
+      plugins: ["obstacle_layer", "inflation_layer"]
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.55
+
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          inf_is_valid: True
+          data_type: "LaserScan"
+          raytrace_max_range: 25.0
+          raytrace_min_range: 0.04
+          obstacle_max_range: 20.0
+          obstacle_min_range: 0.04
+      # static_layer:
+      #   plugin: "nav2_costmap_2d::StaticLayer"
+      #   map_subscribe_transient_local: True
+      always_send_full_costmap: True
+
+costmap_converter:
+  # intra_node:
+  #   ros__parameters:
+  #     min_distance_between_blobs: 100
+  #     alpha_slow: 0.1
+  #     alpha_fast: 0.6
+  ros__parameters:
+    converter_plugin: costmap_converter::CostmapToPolygonsDBSMCCH

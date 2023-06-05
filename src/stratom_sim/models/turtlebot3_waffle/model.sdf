@@ -1,9 +1,9 @@
-<?xml version="1.0" ?>
+<?xml version="1.0"?>
 <sdf version="1.5">
   <model name="turtlebot3_waffle">
-  <pose>0.0 0.0 0.0 0.0 0.0 0.0</pose>
+    <pose>0.0 0.0 0.0 0.0 0.0 0.0</pose>
 
-    <link name="base_footprint"/>
+    <link name="base_footprint" />
 
     <link name="base_link">
 
@@ -128,8 +128,7 @@
           </mesh>
         </geometry>
       </visual>
-      
-     
+
 
       <sensor name="hls_lfcd_lds" type="gpu_ray">
         <always_on>true</always_on>
@@ -146,14 +145,14 @@
             </horizontal>
           </scan>
           <range>
-            <min>0.120000</min>
-            <max>3.5</max>
+            <min>0.5</min>
+            <max>22</max>
             <resolution>0.015000</resolution>
           </range>
           <noise>
             <type>gaussian</type>
             <mean>0.0</mean>
-            <stddev>0.01</stddev>
+            <stddev>0.02</stddev>
           </noise>
         </ray>
         <plugin name="turtlebot3_laserscan" filename="libgazebo_ros_ray_sensor.so">
@@ -351,7 +350,7 @@
       </collision>
     </link>
 
-    <link name="camera_link"/>
+    <link name="camera_link" />
 
     <link name="camera_rgb_frame">
       <inertial>
@@ -498,16 +497,16 @@
 
     </plugin>
 
-     <plugin name="p3d_base_controller" filename="libgazebo_ros_p3d.so">
-        <always_on>true</always_on>
-        <update_rate>50.0</update_rate>
-        <body_name>base_link</body_name>
-        <topic_name>odom</topic_name>
-        <gaussian_noise>0.01</gaussian_noise>
-        <frame_name>world</frame_name>
-        <xyz_offset>0 0 0</xyz_offset>
-        <rpy_offset>0 0 0</rpy_offset>
-      </plugin>
+    <plugin name="p3d_base_controller" filename="libgazebo_ros_p3d.so">
+      <always_on>true</always_on>
+      <update_rate>50.0</update_rate>
+      <body_name>base_link</body_name>
+      <topic_name>odom</topic_name>
+      <gaussian_noise>0.01</gaussian_noise>
+      <frame_name>world</frame_name>
+      <xyz_offset>0 0 0</xyz_offset>
+      <rpy_offset>0 0 0</rpy_offset>
+    </plugin>
 
     <plugin name="turtlebot3_joint_state" filename="libgazebo_ros_joint_state_publisher.so">
       <ros>
