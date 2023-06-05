@@ -43,4 +43,4 @@ costmap_converter:
   #     alpha_slow: 0.1
   #     alpha_fast: 0.6
   ros__parameters:
-    converter_plugin: costmap_converter::CostmapToDynamicObstacles
+    converter_plugin: costmap_converter::CostmapToPolygonsDBSMCCH

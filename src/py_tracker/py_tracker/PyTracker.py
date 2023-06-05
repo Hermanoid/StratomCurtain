@@ -9,12 +9,14 @@ from scipy.spatial import distance as dist
 class PyTracker(Node):
    
     def __init__(self):
-        super().__init__('py_tracker_node')
+        super().__init__('py_tracker_node', parameter_overrides=[])
 
         #ID to assign to the object, dictionary to keep track of mapped objects ID to centroid, number of consecutive frames marked dissapeeared
         self.nextObjectID = 1; 
         self.objects = OrderedDict()
         self.disappeared = OrderedDict()
+        self.robot_x = 0
+        self.robot_y = 0
 
         #Maximum number of frames the object can be undetectable for
         self.maxDisappeared = 50
@@ -27,6 +29,9 @@ class PyTracker(Node):
             10
         )
 
+        self.subscription2 = self.create_subscription( TFMessage, 'tf', self.tf_callback, 10)
+
+
     def register(self, centroid):
         self.objects[self.nextObjectID] = centroid
         self.disappeared[self.nextObjectID] = 0
@@ -37,7 +42,7 @@ class PyTracker(Node):
         del self.disappeared[objectID]
 
     def update(self, polygons):
-        if(len(polygons)):
+        if(len(polygons) == 0):
             for objectID in list(self.disappeared.keys()):
                 self.disappeared[objectID] += 1
 
@@ -50,7 +55,7 @@ class PyTracker(Node):
         inputCentroids = []
 
         for i in enumerate(polygons):
-            center = polygons[i]
+            center = polygons[i].centroid
             inputCentroids[i] = center
 
         if len(self.objects) == 0:
@@ -96,15 +101,18 @@ class PyTracker(Node):
                     self.register(inputCentroids[col])
 
             return self.objects
+        
+    def tf_callback(self, msg):
+        robot_x = msg.transform.x
+        robot_y = msg.transform.y
+
     
-    def listener_callback(self,msg):
+    def listener_callback(self,msg:ObstacleArrayMsg):
         obsArr = msg.obstacles
         polygons = []
         for i in len(obsArr):
             polygons.append((obsArr[i].polygon.centroid.x, obsArr[i].polygon.centroid.y))
-        
         self.update(polygons)
-
 
 def main(args=None):
     #unsure about this
