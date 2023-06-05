@@ -34,8 +34,8 @@ Converts odometry information to a Tf message
     Used to visualize outputs
 
 ### Launch Params:
-1. [Optional] Select a different world from stratom_sim/worlds directory
-    world:=World1
+1. [Optional] Select a different world from stratom_sim/worlds directory<br />
+world:=World1
 
 # License:
 The py_tracker, statom_sim, and odom_tf2_adapter packages are under the MIT licence
