@@ -12,7 +12,7 @@ class PyTracker(Node):
    
     def __init__(self):
         super().__init__('py_tracker_node', parameter_overrides=[])
-        #Message array CHECK!
+        #Output message array
         self.msg = PyTrackerArrayMsg()
         #ID to assign to the object, dictionary to keep track of mapped objects ID to centroid, number of consecutive frames marked dissapeeared
         self.nextObjectID = 1; 
@@ -37,28 +37,29 @@ class PyTracker(Node):
             'warning_messages', 
             10
         )
-
+    #Creates a unique ID for a polygon
     def register(self, centroid):
         self.objects[self.nextObjectID] = centroid
         self.disappeared[self.nextObjectID] = 0
         self.nextObjectID += 1
-
+    #Removes a polygon from list of tracked polygons
     def deregister(self, objectID):
         del self.objects[objectID]
         del self.disappeared[objectID]
     
-    #create individual objects, add to message array. Update parameters as needed CHECK!
+    #Create individual objects, add to message array. Update parameters as needed CHECK!
     def create_object_msg(self):
         cur_object = PyTrackerMsg()
         # populate object fields ...
         # Add object to msg array 
         self.msg.warnings.append(cur_object)
     
-    #called seperately to publish entire array to topic '/warning_messages' CHECK!
+    #Called seperately to publish entire array to topic '/warning_messages' CHECK!
     def publish(self):
         self.publisher_.publish(self.msg)
-
+    #Ids and tracks polygons and detects motion
     def update(self, inputCentroids):
+        #Ages polygons that are being tracked
         if(len(inputCentroids) == 0):
             for objectID in self.disappeared.keys():
                 self.disappeared[objectID] += 1
@@ -70,10 +71,12 @@ class PyTracker(Node):
         
 
         if len(self.objects) == 0:
+            #If there were no registered objects then register all centroids
             for centroid in inputCentroids:
                 self.register(centroid)
 
         else:
+            #Attempt to associate object IDs
             objectIDs = list(self.objects.keys())
             objectCentroids = list(self.objects.values())
 
@@ -99,7 +102,7 @@ class PyTracker(Node):
             
             unusedRows = set(range(0, D.shape[0])).difference(usedRows)
             unusedCols = set(range(0, D.shape[1])).difference(usedCols)
-
+            #Deal with lost or disappeared objects
             if D.shape[0] >= D.shape[1]:
                 for row in unusedRows:
                     objectID = objectIDs[row]
@@ -116,6 +119,7 @@ class PyTracker(Node):
     def listener_callback(self,msg:ObstacleArrayMsg):
         obsArr: List[ObstacleMsg] = list(msg.obstacles)
         centroids = []
+        #Gets the centroids and points from the polygons in the input message
         for obstacle in obsArr:
             points = [(point.x, point.y) for point in obstacle.polygon.points]
             centroid = Polygon(shell= points).centroid
