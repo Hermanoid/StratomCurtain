@@ -9,6 +9,7 @@ from costmap_converter_msgs.msg import ObstacleArrayMsg, ObstacleMsg
 from scipy.spatial import distance as dist
 from typing import List
 import cv2
+from visualization_msgs.msg import Marker, MarkerArray
 
 VIZ_PIXELS_PER_METER = 25
 VIZ_FRAME_SIZE = 300
@@ -71,6 +72,11 @@ class PyTracker(Node):
         #     'warning_messages', 
         #     10
         # )
+        self.marker_publisher_ = self.create_publisher(
+            Marker, 
+            'dynamic_obsticle_marker', 
+            10
+        )
 
     #Creates a unique ID for a polygon
     def register(self, centroid):
@@ -222,6 +228,34 @@ class PyTracker(Node):
         combined_im = np.hstack((input_im, track_im))
         cv2.imshow("Tracks", combined_im)
         cv2.waitKey(1)
+    #Makes a cylinder at the centroid of each shape
+    #Dynamic:  Green
+    #Static:   Orange
+    def visualize_markers(self, msg:ObstacleArrayMsg):
+        # marker_array = MarkerArray()
+        marker = Marker()
+        marker.type = 3
+        marker.id = 0
+        marker.header.stamp = msg.header.stamp
+        marker.header.frame_id = msg.header.frame
+        marker.scale.x = 1.0
+        marker.scale.y = 1.0
+        marker.scale.z = 3.0
+        marker.color.a = 1.0
+        marker.pose.orientation.x = 0.0
+        marker.pose.orientation.y = 0.0
+        marker.pose.orientation.z = 0.0
+        marker.pose.orientation.w = 1.0
+        marker.color.r = 1.0
+        marker.color.g = 0.0
+        marker.color.b = 0.0
+        for (centroid.x, centroid.y) in self.objects.values():
+            marker.pose.position.x = centroid.x
+            marker.pose.position.y = centroid.y
+            marker.pose.position.z = 0
+            marker_publisher_.publish(marker)
+            # marker_array.append(marker)
+        # marker_publisher_.publish(marker_array)
 
 def main(args=None):
     rclpy.init(args=args)
