@@ -72,10 +72,12 @@ class PyTracker(Node):
         #     10
         # )
 
-    def register(self, polygon):
-        self.objects[self.nextObjectID] = TrackedObject(polygon)
+    #Creates a unique ID for a polygon
+    def register(self, centroid):
+        self.objects[self.nextObjectID] = centroid
+        self.disappeared[self.nextObjectID] = 0
         self.nextObjectID += 1
-
+    #Removes a polygon from list of tracked polygons
     def deregister(self, objectID):
         del self.objects[objectID]
     
@@ -86,7 +88,7 @@ class PyTracker(Node):
     #     # Add object to msg array 
     #     self.msg.warnings.append(cur_object)
     
-    #called seperately to publish entire array to topic '/warning_messages' CHECK!
+    #Called seperately to publish entire array to topic '/warning_messages' CHECK!
     def publish(self):
         self.publisher_.publish(self.msg)
 
@@ -103,6 +105,7 @@ class PyTracker(Node):
                 self.register(polygon)
 
         else:
+            #Attempt to associate object IDs
             objectIDs = list(self.objects.keys())
 
             objectCentroids = [(obj.polygon.centroid.x, obj.polygon.centroid.y) for obj in self.objects.values()]
@@ -131,7 +134,7 @@ class PyTracker(Node):
             
             unusedRows = set(range(0, D.shape[0])).difference(usedRows)
             unusedCols = set(range(0, D.shape[1])).difference(usedCols)
-
+            #Deal with lost or disappeared objects
             if D.shape[0] >= D.shape[1]:
                 for row in unusedRows:
                     objectID = objectIDs[row]
@@ -176,6 +179,7 @@ class PyTracker(Node):
     
     def listener_callback(self,msg:ObstacleArrayMsg):
         obsArr: List[ObstacleMsg] = list(msg.obstacles)
+        #Gets the centroids and points from the polygons in the input message
         polygons = []
         bad_points = []
         for obstacle in obsArr:

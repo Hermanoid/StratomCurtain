@@ -22,7 +22,7 @@ def generate_launch_description():
     y_pose = LaunchConfiguration("y_pose", default="-0.5")
     world = LaunchConfiguration("world")
 
-    default_world = "factory"
+    default_world = "World1"
     worlds_path = os.path.join(pkg_share, "worlds")
 
     params_file = os.path.join(pkg_share, "config", "default.yaml")
