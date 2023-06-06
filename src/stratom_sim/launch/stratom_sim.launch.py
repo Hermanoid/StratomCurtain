@@ -38,7 +38,7 @@ def generate_launch_description():
             os.pathsep,
             humble_share,
         ],
-    ).visit(lc)
+    )
 
     # Declare the launch arguments
     declare_world_cmd = DeclareLaunchArgument(
@@ -64,6 +64,8 @@ def generate_launch_description():
         package="costmap_converter", executable="standalone_converter", name="costmap_converter", output="screen", parameters=[params_file]
     )
 
+    pytracker_cmd = Node(package="py_tracker", executable="py_tracker", name="py_tracker_node")
+
     # Add the commands to the launch description
     ld = LaunchDescription()
     ld.add_action(gazebo_env_cmd)
@@ -74,5 +76,6 @@ def generate_launch_description():
     ld.add_action(spawn_turtlebot_cmd)
 
     ld.add_action(costmap_converter_cmd)
+    ld.add_action(pytracker_cmd)
 
     return ld
