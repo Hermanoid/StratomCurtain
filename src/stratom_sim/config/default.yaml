@@ -42,5 +42,9 @@ costmap_converter:
   #     min_distance_between_blobs: 100
   #     alpha_slow: 0.1
   #     alpha_fast: 0.6
-  ros__parameters:
-    converter_plugin: costmap_converter::CostmapToPolygonsDBSMCCH
+  costmap_converter:
+    ros__parameters:
+      converter_plugin: costmap_converter::CostmapToPolygonsDBSMCCH
+      cluster_max_pts: 250
+      cluster_mind_pts: 5
+      cluster_max_distance: 0.5
