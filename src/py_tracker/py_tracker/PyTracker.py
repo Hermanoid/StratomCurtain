@@ -58,7 +58,7 @@ class PyTracker(Node):
         # How fast must the object be moving to be considered dynamic (should be m/s)
         self.declare_parameter("dynamic_movement_speed", 0.3)
         # How long must the object continue moving to be considered dynamic
-        self.declare_parameter("dynamic_time_threshold", 1.5)
+        self.declare_parameter("dynamic_time_threshold",  0.75)
         # After an object has stopped moving, how long do we wait before dropping it back to static
         # Negative values will be interpretted as "never"
         self.declare_parameter("dynamic_memory_time", 10.0)
@@ -79,9 +79,8 @@ class PyTracker(Node):
         )
 
     #Creates a unique ID for a polygon
-    def register(self, centroid):
-        self.objects[self.nextObjectID] = centroid
-        self.disappeared[self.nextObjectID] = 0
+    def register(self, polygon):
+        self.objects[self.nextObjectID] = TrackedObject(polygon)
         self.nextObjectID += 1
     #Removes a polygon from list of tracked polygons
     def deregister(self, objectID):
