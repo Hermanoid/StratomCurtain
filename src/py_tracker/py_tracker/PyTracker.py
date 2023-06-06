@@ -11,6 +11,7 @@ from rcl_interfaces.msg import SetParametersResult
 from scipy.spatial import distance as dist
 from typing import List
 import cv2
+from visualization_msgs.msg import Marker, MarkerArray
 
 VIZ_PIXELS_PER_METER = 20
 VIZ_FRAME_SIZE = 350
@@ -71,6 +72,11 @@ class PyTracker(Node):
         #     'warning_messages',
         #     10
         # )
+        self.marker_publisher_ = self.create_publisher(
+            MarkerArray, 
+            'dynamic_obsticle_marker', 
+            10
+        )
 
     def update_parameters(self, _):
         self.dynamic_movement_speed = self.get_parameter("dynamic_movement_speed").get_parameter_value().double_value
@@ -200,6 +206,7 @@ class PyTracker(Node):
             polygons.append(polygon)
         self.update(polygons)
         self.visualize_tracks(polygons, bad_points)
+        self.visualize_markers(msg)
 
     def visualize_tracks(self, inputPolygons, bad_points):
         offset_y = offset_x = VIZ_FRAME_SIZE / 2
@@ -233,6 +240,46 @@ class PyTracker(Node):
         combined_im = np.hstack((input_im, track_im))
         cv2.imshow("Tracks", combined_im)
         cv2.waitKey(1)
+    #Makes a cylinder at the centroid of each shape
+    #Dynamic:  Green
+    #Static:   Orange
+    def visualize_markers(self, msg:ObstacleArrayMsg):
+        increment = 1
+        marker_array = MarkerArray()
+        clear_marker = Marker()
+        clear_marker.id = 0
+        clear_marker.action = Marker.DELETEALL
+        marker_array.markers.append(clear_marker)
+        
+        for obj in self.objects.values():
+            marker = Marker()
+            marker.type = 3
+            marker.header.stamp = msg.header.stamp
+            marker.header.frame_id = "map"
+            marker.scale.x = 0.35
+            marker.scale.y = 0.35
+            marker.scale.z = 0.75
+            marker.color.a = 1.0
+            marker.pose.orientation.x = 0.0
+            marker.pose.orientation.y = 0.0
+            marker.pose.orientation.z = 0.0
+            marker.pose.orientation.w = 1.0
+            if obj.isDynamic:
+                marker.color.r = 0.988
+                marker.color.g = 0.651
+                marker.color.b = 0.012
+            else:
+                marker.color.r = 0.012
+                marker.color.g = 0.675
+                marker.color.b = 0.075
+            marker.id = increment
+            increment = increment + 1
+            marker.pose.position.x = obj.polygon.centroid.x
+            marker.pose.position.y = obj.polygon.centroid.y
+            marker.pose.position.z = 0.0
+            # self.marker_publisher_.publish(marker)
+            marker_array.markers.append(marker)
+        self.marker_publisher_.publish(marker_array)
 
 
 def main(args=None):
