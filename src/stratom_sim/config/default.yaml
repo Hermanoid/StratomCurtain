@@ -42,5 +42,18 @@ costmap_converter:
   #     min_distance_between_blobs: 100
   #     alpha_slow: 0.1
   #     alpha_fast: 0.6
+  costmap_converter:
+    ros__parameters:
+      converter_plugin: costmap_converter::CostmapToPolygonsDBSMCCH
+      cluster_max_pts: 250
+      cluster_mind_pts: 5
+      cluster_max_distance: 0.5
+
+py_tracker_node:
   ros__parameters:
-    converter_plugin: costmap_converter::CostmapToPolygonsDBSMCCH
+    dynamic_memory_time: 1.2
+    dynamic_movement_speed: 0.051
+    dynamic_time_threshold: 0.6
+    velocity_update_rate: 0.2
+
+
