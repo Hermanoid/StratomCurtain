@@ -8,6 +8,10 @@ from py_tracker_msg import PyTrackerArrayMsg, PyTrackerMsg
 from scipy.spatial import distance as dist
 from typing import List
 import cv2
+from tf2_ros.transform_listener import TransformListener
+from tf2_ros.buffer import Buffer
+import math
+
 
 VIZ_PIXELS_PER_METER = 20
 VIZ_FRAME_SIZE = 300
@@ -42,6 +46,10 @@ class PyTracker(Node):
             10
         )
 
+        #Setup for finding robot position
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+
     #Creates a unique ID for a polygon
     def register(self, centroid):
         self.objects[self.nextObjectID] = centroid
@@ -65,6 +73,10 @@ class PyTracker(Node):
 
     #Ids and tracks polygons and detects motion
     def update(self, inputCentroids):
+        #Grab position of robot on map
+        t = self.tf_buffer.lookup_transform("map", "base_link", rclpy.time.Time())
+        self.robot_x = t.translation.x
+        self.robot_y = t.translation.y
         #Ages polygons that are being tracked
         if(len(inputCentroids) == 0):
             for objectID in self.disappeared.keys():
@@ -119,6 +131,26 @@ class PyTracker(Node):
 
             return self.objects
     
+    def get_min_angle(self, polygon):
+        minangle = None
+        for p in polygon:
+            ydiff = p.y - self.robot_y
+            xdiff = p.x - self.robot_x
+            angle = math.degrees(math.atan(ydiff/xdiff))
+            if(minangle == None or angle < minangle):
+                minangle = angle
+        return minangle
+    
+    def get_max_angle(self, polygon):
+        maxangle = None
+        for p in polygon:
+            ydiff = p.y - self.robot_y
+            xdiff = p.x - self.robot_x
+            angle = math.degrees(math.atan(ydiff/xdiff))
+            if(maxangle == None or angle > maxangle):
+                maxangle = angle
+        return maxangle
+
     def listener_callback(self,msg:ObstacleArrayMsg):
         obsArr: List[ObstacleMsg] = list(msg.obstacles)
         #Gets the centroids and points from the polygons in the input message
