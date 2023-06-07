@@ -59,7 +59,7 @@ py_tracker_node:
     # Polygon defining the boundary of the detection curtain
     # ROS2 is admittedly pretty dumb with array parameters, so this needs to be a dictionary.
     curtain_boundary:
-      a: [-5, -5]
-      b: [-5, 5]
-      c: [5, 5]
-      d: [5, -5]
+      a: [-5.0, -5.0]
+      b: [-5.0, 5.0]
+      c: [5.0, 5.0]
+      d: [5.0, -5.0]

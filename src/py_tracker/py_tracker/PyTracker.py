@@ -68,7 +68,7 @@ class PyTracker(Node):
         self.declare_parameter("velocity_update_rate", 0.2)
         # ROS doesn't allow any complex types, including arrays of points, so we have to get creative with a dict
         # self.declare_parameter("curtain_boundary", {"a": [0, 10], "b": [-10, -10], "c": [10, -10]})
-        self.declare_parameters("curtain_boundary", [["a", [0, 10]], ["b", [-10, -10]], ["c", [-10, 10]]])
+        self.declare_parameters("curtain_boundary", [["a", [0.0, 10.0]], ["b", [-10.0, -10.0]], ["c", [-10.0, 10.0]]])
         self.declare_parameter("curtain_publish_rate", 1.0)
 
         self.poly_pub = self.create_publisher(PolygonMsg, "curtain", 1)
@@ -90,7 +90,9 @@ class PyTracker(Node):
         self.dynamic_memory_time = self.get_parameter("dynamic_memory_time").get_parameter_value().double_value
         self.velocity_update_rate = self.get_parameter("velocity_update_rate").get_parameter_value().double_value
 
-        boundary_points = [parameter.value for parameter in self.get_parameters_by_prefix("curtain_boundary").values()]
+        boundary_points = [
+            parameter.get_parameter_value().double_array for parameter in self.get_parameters_by_prefix("curtain_boundary").values()
+        ]
         self.curtain_boundary = Polygon(shell=boundary_points)
 
         pub_rate = self.get_parameter("curtain_publish_rate").get_parameter_value().double_value
