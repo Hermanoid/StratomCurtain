@@ -1,17 +1,20 @@
-from enum import Enum
 import rclpy
+from enum import Enum
 from shapely import Polygon
 import numpy as np
 from rclpy.node import Node
 from collections import OrderedDict
-from costmap_converter_msgs.msg import ObstacleArrayMsg, ObstacleMsg
-from rcl_interfaces.msg import SetParametersResult
-
-# from py_tracker_msg import PyTrackerArrayMsg, PyTrackerMsg
 from scipy.spatial import distance as dist
 from typing import List
 import cv2
+
+from costmap_converter_msgs.msg import ObstacleArrayMsg, ObstacleMsg
+from rcl_interfaces.msg import SetParametersResult
+from geometry_msgs.msg import Polygon as PolygonMsg
+from geometry_msgs.msg import Point32
 from visualization_msgs.msg import Marker, MarkerArray
+
+# from py_tracker_msg import PyTrackerArrayMsg, PyTrackerMsg
 
 VIZ_PIXELS_PER_METER = 20
 VIZ_FRAME_SIZE = 350
@@ -63,6 +66,13 @@ class PyTracker(Node):
         self.declare_parameter("dynamic_memory_time", 10.0)
         # Higher values will prioritize instantaneous velocity and deprioritize the rolling average
         self.declare_parameter("velocity_update_rate", 0.2)
+        # ROS doesn't allow any complex types, including arrays of points, so we have to get creative with a dict
+        # self.declare_parameter("curtain_boundary", {"a": [0, 10], "b": [-10, -10], "c": [10, -10]})
+        self.declare_parameters("curtain_boundary", [["a", [0, 10]], ["b", [-10, -10]], ["c", [-10, 10]]])
+        self.declare_parameter("curtain_publish_rate", 1.0)
+
+        self.poly_pub = self.create_publisher(PolygonMsg, "curtain", 1)
+        self.poly_timer = None
 
         self.update_parameters(None)
         self.add_on_set_parameters_callback(self.update_parameters)
@@ -72,18 +82,25 @@ class PyTracker(Node):
         #     'warning_messages',
         #     10
         # )
-        self.marker_publisher_ = self.create_publisher(
-            MarkerArray, 
-            'dynamic_obsticle_marker', 
-            10
-        )
+        self.marker_publisher_ = self.create_publisher(MarkerArray, "dynamic_obsticle_marker", 10)
 
     def update_parameters(self, _):
         self.dynamic_movement_speed = self.get_parameter("dynamic_movement_speed").get_parameter_value().double_value
         self.dynamic_time_threshold = self.get_parameter("dynamic_time_threshold").get_parameter_value().double_value
         self.dynamic_memory_time = self.get_parameter("dynamic_memory_time").get_parameter_value().double_value
         self.velocity_update_rate = self.get_parameter("velocity_update_rate").get_parameter_value().double_value
+
+        boundary_points = [parameter.value for parameter in self.get_parameters_by_prefix("curtain_boundary").values()]
+        self.curtain_boundary = Polygon(shell=boundary_points)
+
+        pub_rate = self.get_parameter("curtain_publish_rate").get_parameter_value().double_value
+        if self.poly_timer:
+            self.poly_timer.destroy()
+        self.poly_timer = self.create_timer(pub_rate, self.publish_curtain)
         return SetParametersResult(successful=True)
+
+    def publish_curtain(self):
+        self.poly_pub.publish(PolygonMsg(points=[Point32(x=x, y=y) for x, y, in self.curtain_boundary.exterior.coords]))
 
     # Creates a unique ID for a polygon
     def register(self, polygon):
@@ -240,17 +257,18 @@ class PyTracker(Node):
         combined_im = np.hstack((input_im, track_im))
         cv2.imshow("Tracks", combined_im)
         cv2.waitKey(1)
-    #Makes a cylinder at the centroid of each shape
-    #Dynamic:  Green
-    #Static:   Orange
-    def visualize_markers(self, msg:ObstacleArrayMsg):
+
+    # Makes a cylinder at the centroid of each shape
+    # Dynamic:  Green
+    # Static:   Orange
+    def visualize_markers(self, msg: ObstacleArrayMsg):
         increment = 1
         marker_array = MarkerArray()
         clear_marker = Marker()
         clear_marker.id = 0
         clear_marker.action = Marker.DELETEALL
         marker_array.markers.append(clear_marker)
-        
+
         for obj in self.objects.values():
             marker = Marker()
             marker.type = 3
