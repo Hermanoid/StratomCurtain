@@ -6,6 +6,9 @@ from rclpy.node import Node
 from collections import OrderedDict
 from costmap_converter_msgs.msg import ObstacleArrayMsg, ObstacleMsg
 from rcl_interfaces.msg import SetParametersResult
+from tf2_ros.transform_listener import TransformListener
+from tf2_ros.buffer import Buffer
+import math
 
 # from py_tracker_msg import PyTrackerArrayMsg, PyTrackerMsg
 from scipy.spatial import distance as dist
@@ -78,6 +81,10 @@ class PyTracker(Node):
             10
         )
 
+        #Setup for finding robot position
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+
     def update_parameters(self, _):
         self.dynamic_movement_speed = self.get_parameter("dynamic_movement_speed").get_parameter_value().double_value
         self.dynamic_time_threshold = self.get_parameter("dynamic_time_threshold").get_parameter_value().double_value
@@ -106,6 +113,10 @@ class PyTracker(Node):
         self.publisher_.publish(self.msg)
 
     def update(self, inputPolygons: List[Polygon]):
+        #Grab position of robot on map
+        t = self.tf_buffer.lookup_transform("map", "base_link", rclpy.time.Time())
+        self.robot_x = t.translation.x
+        self.robot_y = t.translation.y
         if len(inputPolygons) == 0:
             for objectID in list(self.objects.keys()):
                 self.objects[objectID].dissappearedFrames += 1
@@ -281,6 +292,25 @@ class PyTracker(Node):
             marker_array.markers.append(marker)
         self.marker_publisher_.publish(marker_array)
 
+    def get_min_angle(self, polygon):
+        minangle = None
+        for p in polygon:
+            ydiff = p.y - self.robot_y
+            xdiff = p.x - self.robot_x
+            angle = math.degrees(math.atan(ydiff/xdiff))
+            if(minangle == None or angle < minangle):
+                minangle = angle
+        return minangle
+    
+    def get_max_angle(self, polygon):
+        maxangle = None
+        for p in polygon:
+            ydiff = p.y - self.robot_y
+            xdiff = p.x - self.robot_x
+            angle = math.degrees(math.atan(ydiff/xdiff))
+            if(maxangle == None or angle > maxangle):
+                maxangle = angle
+        return maxangle
 
 def main(args=None):
     rclpy.init(args=args)
