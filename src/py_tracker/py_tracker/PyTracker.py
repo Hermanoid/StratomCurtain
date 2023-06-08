@@ -9,7 +9,7 @@ from costmap_converter_msgs.msg import ObstacleArrayMsg, ObstacleMsg
 from rcl_interfaces.msg import SetParametersResult
 from tf2_ros.transform_listener import TransformListener
 from tf2_ros.buffer import Buffer
-from tf2_ros import LookupException
+from tf2_ros import TransformException
 import math
 
 from py_tracker_msgs.msg import PyTrackerArrayMsg, PyTrackerMsg
@@ -38,7 +38,7 @@ class TrackState(Enum):
 class TrackedObject:
     def __init__(self, polygon: Polygon):
         self.polygon: Polygon = polygon
-        self.dissappearedFrames = 0
+        self.disappearedFrames = 0
         self.state: TrackState = TrackState.Static
         self.stateStartTime = None
         self.lastTrackedTime = None
@@ -61,34 +61,32 @@ class PyTracker(Node):
         self.robot_x = 0
         self.robot_y = 0
 
-        # Maximum number of frames the object can be undetectable for
-        self.maxDisappeared = 0
-
-        # Create the subscription to the topic
-        self.create_subscription(ObstacleArrayMsg, "costmap_obstacles", self.listener_callback, 10)
-
         # How fast must the object be moving to be considered dynamic (should be m/s)
         self.declare_parameter("dynamic_movement_speed", 0.3)
         # How long must the object continue moving to be considered dynamic
         self.declare_parameter("dynamic_time_threshold", 0.75)
         # After an object has stopped moving, how long do we wait before dropping it back to static
-        # Negative values will be interpretted as "never"
+        # Negative values will be interpretted as "never drop back to static"
         self.declare_parameter("dynamic_memory_time", 10.0)
         # Higher values will prioritize instantaneous velocity and deprioritize the rolling average
         self.declare_parameter("velocity_update_rate", 0.2)
-        # ROS doesn't allow any complex types, including a nested arrays of points,
-        # so we have to get creative with a 1d array (format pt1.x, pt1.y, pt2.x, pt2.y, ....)
+        # Maximum number of frames the object can be undetectable for before getting dropped
+        self.declare_parameter("max_disapeared_frames", 30)
+        # ROS2 doesn't allow any complex types, including a nested array like [[pt1.x, pt1.y], [pt2.x, pt2.y], ...]
+        # so for this polygon we have to get creative with a 1d array formatted [pt1.x, pt1.y, pt2.x, pt2.y, ...]
         self.declare_parameter("curtain_boundary", [0.0, 10.0, -10.0, -10.0, 10.0, -10.0])
+
         self.declare_parameter("curtain_publish_period", 1.0)
+        self.declare_parameter("obstacles_sub_topic", "costmap_obstacles")
+        self.declare_parameter("marker_pub_topic", "dynamic_marker")
+        self.declare_parameter("curtain_pub_topic", "curtain")
+        self.declare_parameter("warnings_pub_topic", "warnings")
 
-        self.declare_parameter("marker_topic", "dynamic_marker")
-        self.declare_parameter("curtain_topic", "curtain")
-        self.declare_parameter("warnings_topic", "warnings")
-
-        self.poly_pub = None
         self.poly_timer = None
+        self.poly_pub = None
         self.marker_pub = None
         self.warnings_pub = None
+        self.obstacles_sub = None
 
         self.update_parameters(None)
         self.add_on_set_parameters_callback(self.update_parameters)
@@ -102,6 +100,7 @@ class PyTracker(Node):
         self.dynamic_time_threshold = self.get_parameter("dynamic_time_threshold").get_parameter_value().double_value
         self.dynamic_memory_time = self.get_parameter("dynamic_memory_time").get_parameter_value().double_value
         self.velocity_update_rate = self.get_parameter("velocity_update_rate").get_parameter_value().double_value
+        self.max_disappeared = 50
 
         boundary_array = self.get_parameter("curtain_boundary").get_parameter_value().double_array_value
         # This big-brain one-liner grabs every other point for x, every other point (shifted one) for y, and pairs them together
@@ -111,24 +110,29 @@ class PyTracker(Node):
         # Grab the updated curtain publish rate, destroy the old timer, and create a new one with the new rate.
         # ROS does not allow changing the period of an preexisting timer.
         pub_rate = self.get_parameter("curtain_publish_period").get_parameter_value().double_value
-        if pub_rate != self.poly_timer.timer_period_ns / 1000000000.0:
+        if not self.poly_timer or pub_rate != self.poly_timer.timer_period_ns / 1000000000.0:
             if self.poly_timer:
                 self.poly_timer.destroy()
             self.poly_timer = self.create_timer(pub_rate, self.publish_curtain)
 
-        self.poly_pub = self.update_publisher(self.poly_pub, PolygonMsg, "curtain_topic", 1)
-        self.marker_pub = self.update_publisher(self.marker_pub, MarkerArray, "marker_topic", 10)
-        self.warnings_pub = self.update_publisher(self.warnings_pub, PyTrackerArrayMsg, "warnings_topic", 10)
+        self.poly_pub = self.update_publisher(self.poly_pub, PolygonMsg, "curtain_pub_topic", 1)
+        self.marker_pub = self.update_publisher(self.marker_pub, MarkerArray, "marker_pub_topic", 10)
+        self.warnings_pub = self.update_publisher(self.warnings_pub, PyTrackerArrayMsg, "warnings_pub_topic", 10)
+
+        obstacles_sub_topic = self.get_parameter("obstacles_sub_topic").get_parameter_value().string_value
+        if not self.obstacles_sub or obstacles_sub_topic != self.obstacles_sub.topic:
+            if self.obstacles_sub:
+                self.obstacles_sub.destroy()
+            self.obstacles_sub = self.create_subscription(ObstacleArrayMsg, obstacles_sub_topic, self.listener_callback, 10)
         return SetParametersResult(successful=True)
 
-    """
+    def update_publisher(self, publisher, type, parameter, qos):
+        """
         Similar to the timer object, ROS does not allow changing the topic of publishers on existinig publisher objects
         Thus, we need to destroy the old object and create it anew
-    """
-
-    def update_publisher(self, publisher, type, parameter, qos):
+        """
         new_topic_name = self.get_parameter(parameter).get_parameter_value().string_value
-        if new_topic_name != publisher.topic:
+        if not publisher or new_topic_name != publisher.topic:
             if publisher:
                 publisher.destroy()
             return self.create_publisher(type, new_topic_name, qos)
@@ -168,19 +172,23 @@ class PyTracker(Node):
                 warning_array.warnings.append(cur_obs)
         self.warnings_pub.publish(warning_array)
 
-    def update(self, inputPolygons: List[Polygon], msg: ObstacleArrayMsg):
+    def update(self, inputPolygons: List[Polygon]):
+        """
+        This update function runs on each frame of polygons, tracks them, detects motion, and publishes results
+        """
         # Grab position of robot on map
         try:
             t = self.tf_buffer.lookup_transform("map", "base_link", rclpy.time.Time(), timeout=Duration(seconds=1))
-        except LookupException:
-            self.get_logger().warning("PyTrakcer timed out waiting for robot transform", throttle_duration_sec=5)
+        except TransformException as e:
+            self.get_logger().warning("PyTracker failed to get robot transform: " + str(e), throttle_duration_sec=5)
+            return
         self.robot_x = t.transform.translation.x
         self.robot_y = t.transform.translation.y
         # If no polygons come in, start dissapearing all tracks
         if len(inputPolygons) == 0:
             for objectID in list(self.objects.keys()):
-                self.objects[objectID].dissappearedFrames += 1
-                if self.objects[objectID].dissappearedFrames > self.maxDisappeared:
+                self.objects[objectID].disappearedFrames += 1
+                if self.objects[objectID].disappearedFrames > self.max_disappeared:
                     self.deregister(objectID)
             return self.objects
 
@@ -217,7 +225,7 @@ class PyTracker(Node):
                 newPoly = inputPolygons[col]
                 self.detect_dynamic(objectID, newPoly)
                 self.objects[objectID].polygon = newPoly
-                self.objects[objectID].dissappearedFrames = 0
+                self.objects[objectID].disappearedFrames = 0
 
                 usedRows.add(row)
                 usedCols.add(col)
@@ -229,9 +237,9 @@ class PyTracker(Node):
             if D.shape[0] >= D.shape[1]:
                 for row in unusedRows:
                     objectID = objectIDs[row]
-                    self.objects[objectID].dissappearedFrames += 1
+                    self.objects[objectID].disappearedFrames += 1
 
-                    if self.objects[objectID].dissappearedFrames > self.maxDisappeared:
+                    if self.objects[objectID].disappearedFrames > self.max_disappeared:
                         self.deregister(objectID)
             # Else if there were more polygons detected than tracked this frame, register the new ones
             else:
@@ -240,12 +248,11 @@ class PyTracker(Node):
 
             return self.objects
 
-    """
-        For an object with a given object ID, look for movement between the remembered location and the 
-        provided new polygon location, do some filtering, and finally mark this object static/dynamic.
-    """
-
     def detect_dynamic(self, objectID, newPoly: Polygon):
+        """
+        For an object with a given object ID, look for movement between the remembered location and the
+        provided new polygon location, do some filtering, and finally mark this object static/dynamic.
+        """
         nowtime = self.get_clock().now()
 
         def getElapsed(oldTime):
@@ -283,7 +290,6 @@ class PyTracker(Node):
                     obj.updateState(TrackState.Static, nowtime)
 
         obj.lastTrackedTime = nowtime
-        pass
 
     def listener_callback(self, msg: ObstacleArrayMsg):
         obsArr: List[ObstacleMsg] = list(msg.obstacles)
@@ -326,7 +332,7 @@ class PyTracker(Node):
         for objectID, obj in zip(self.objects.keys(), self.objects.values()):
             centroid_pt = pixelify((obj.polygon.centroid.x, obj.polygon.centroid.y))
             cv2.putText(
-                track_im, f"{objectID}, d{obj.dissappearedFrames}", centroid_pt, cv2.FONT_HERSHEY_PLAIN, 0.5, (1, 1, 1), 1, cv2.LINE_AA
+                track_im, f"{objectID}, d{obj.disappearedFrames}", centroid_pt, cv2.FONT_HERSHEY_PLAIN, 0.5, (1, 1, 1), 1, cv2.LINE_AA
             )
 
         # Combine input and tracked (left and right) images and show

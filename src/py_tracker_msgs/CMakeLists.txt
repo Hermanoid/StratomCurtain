@@ -27,7 +27,7 @@ if(BUILD_TESTING)
 endif()
 
 
-rosidl_generate_interfaces(costmap_converter_msgs
+rosidl_generate_interfaces(py_tracker_msgs
   "msg/PyTrackerMsg.msg"
   "msg/PyTrackerArrayMsg.msg"
   DEPENDENCIES builtin_interfaces std_msgs
