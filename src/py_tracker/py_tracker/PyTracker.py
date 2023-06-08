@@ -3,11 +3,13 @@ from enum import Enum
 from shapely import Polygon
 import numpy as np
 from rclpy.node import Node
+from rclpy.time import Duration
 from collections import OrderedDict
 from costmap_converter_msgs.msg import ObstacleArrayMsg, ObstacleMsg
 from rcl_interfaces.msg import SetParametersResult
 from tf2_ros.transform_listener import TransformListener
 from tf2_ros.buffer import Buffer
+from tf2_ros import LookupException
 import math
 
 # from py_tracker_msg import PyTrackerArrayMsg, PyTrackerMsg
@@ -80,18 +82,12 @@ class PyTracker(Node):
         self.declare_parameter("curtain_boundary", [0.0, 10.0, -10.0, -10.0, 10.0, -10.0])
         self.declare_parameter("curtain_publish_period", 1.0)
 
-        self.poly_pub = self.create_publisher(PolygonMsg, "curtain", 1)
+        self.poly_pub = None
         self.poly_timer = None
+        self.marker_pub = None
 
         self.update_parameters(None)
         self.add_on_set_parameters_callback(self.update_parameters)
-        # Create a publisher to a topic (be able to change topic name?)
-        # self.publisher_ = self.create_publisher(
-        #     PyTrackerArrayMsg,
-        #     'warning_messages',
-        #     10
-        # )
-        self.marker_publisher_ = self.create_publisher(MarkerArray, "dynamic_obsticle_marker", 10)
 
         # Setup for finding robot position
         self.tf_buffer = Buffer()
@@ -114,7 +110,16 @@ class PyTracker(Node):
         if self.poly_timer:
             self.poly_timer.destroy()
         self.poly_timer = self.create_timer(pub_rate, self.publish_curtain)
+
+        self.poly_pub = self.update_publisher(self.poly_pub, PolygonMsg, "curtain_topic", 1)
+        self.marker_pub = self.update_publisher(self.marker_pub, MarkerArray, "marker_topic", 10)
         return SetParametersResult(successful=True)
+
+    def update_publisher(self, publisher, type, parameter, qos):
+        new_topic_name = self.get_parameter(parameter).get_parameter_value().string_value
+        if publisher:
+            publisher.destroy()
+        return self.create_publisher(type, new_topic_name, qos)
 
     def publish_curtain(self):
         # This one-line lad converters each point of the (exterior of the) curtain polygon into Point32 messages,
@@ -144,9 +149,12 @@ class PyTracker(Node):
 
     def update(self, inputPolygons: List[Polygon]):
         # Grab position of robot on map
-        t = self.tf_buffer.lookup_transform("map", "base_link", rclpy.time.Time())
-        self.robot_x = t.translation.x
-        self.robot_y = t.translation.y
+        try:
+            t = self.tf_buffer.lookup_transform("map", "base_link", rclpy.time.Time(), timeout=Duration(seconds=1))
+        except LookupException:
+            self.get_logger().warning("PyTrakcer timed out waiting for robot transform", throttle_duration_sec=5)
+        self.robot_x = t.transform.translation.x
+        self.robot_y = t.transform.translation.y
         # If no polygons come in, start dissapearing all tracks
         if len(inputPolygons) == 0:
             for objectID in list(self.objects.keys()):
@@ -343,7 +351,7 @@ class PyTracker(Node):
             marker.pose.position.z = 0.0
             # self.marker_publisher_.publish(marker)
             marker_array.markers.append(marker)
-        self.marker_publisher_.publish(marker_array)
+        self.marker_pub.publish(marker_array)
 
     def get_angles(self, polygon):
         angles = []

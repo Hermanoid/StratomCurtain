@@ -60,3 +60,5 @@ py_tracker_node:
     # ROS2 is admittedly pretty dumb with array parameters, so this needs to be a 1D array
     # Every other number is x, then y, for each point: (x1, y1, x2, y2, ...)
     curtain_boundary: [-5.0, -5.0, -5.0, 5.0, 5.0, 5.0, 5.0, -5.0]
+    marker_topic: dynamic_obsticle_marker
+    curtain_topic: curtain_topic
