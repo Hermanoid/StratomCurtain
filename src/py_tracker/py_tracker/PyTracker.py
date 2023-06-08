@@ -27,6 +27,7 @@ class TrackedObject():
         self.stateStartTime = None
         self.lastTrackedTime = None
         self.isDynamic = False
+        self.initializedTime = None
 
     def updateState(self, newState: TrackState, nowtime):
         self.state = newState
@@ -79,8 +80,9 @@ class PyTracker(Node):
         )
 
     #Creates a unique ID for a polygon
-    def register(self, polygon):
+    def register(self, polygon, msg:ObstacleArrayMsg):
         self.objects[self.nextObjectID] = TrackedObject(polygon)
+        self.objects[slef.nextObjectID] = msg.header.stamp
         self.nextObjectID += 1
     #Removes a polygon from list of tracked polygons
     def deregister(self, objectID):
@@ -97,7 +99,7 @@ class PyTracker(Node):
     def publish(self):
         self.publisher_.publish(self.msg)
 
-    def update(self, inputPolygons: List[Polygon]):
+    def update(self, inputPolygons: List[Polygon], msg:ObstacleArrayMsg):
         if(len(inputPolygons) == 0):
             for objectID in list(self.objects.keys()):
                 self.objects[objectID].dissappearedFrames += 1
@@ -107,7 +109,7 @@ class PyTracker(Node):
         
         if len(self.objects) == 0:
             for polygon in inputPolygons:
-                self.register(polygon)
+                self.register(polygon, msg)
 
         else:
             #Attempt to associate object IDs
@@ -149,7 +151,7 @@ class PyTracker(Node):
                         self.deregister(objectID)
             else:
                 for col in unusedCols:
-                    self.register(inputPolygons[col])
+                    self.register(inputPolygons[col], msg)
 
             return self.objects
 
@@ -194,7 +196,7 @@ class PyTracker(Node):
                 continue
             polygon = Polygon(shell= points)
             polygons.append(polygon)
-        self.update(polygons)
+        self.update(polygons, msg)
         self.visualize_tracks(polygons, bad_points)
         self.visualize_markers(msg)
 

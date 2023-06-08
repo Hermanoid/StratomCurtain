@@ -16,3 +16,5 @@ string frame_id
 #Specifices if the object is static or dynamic 
 bool is_static 
 
+#Time stamp at creation, (could be time timestamp)
+time time_created
