@@ -55,11 +55,13 @@ py_tracker_node:
     dynamic_movement_speed: 0.05
     dynamic_time_threshold: 0.6
     velocity_update_rate: 0.2
+    max_disappeared_frames: 50
     curtain_publish_period: 1.0
     # Polygon defining the boundary of the detection curtain
     # ROS2 is admittedly pretty dumb with array parameters, so this needs to be a 1D array
     # Every other number is x, then y, for each point: (x1, y1, x2, y2, ...)
     curtain_boundary: [-5.0, -5.0, -5.0, 5.0, 5.0, 5.0, 5.0, -5.0]
-    marker_topic: dynamic_marker
-    curtain_topic: curtain
-    warnings_topic: warnings
+    obstacles_sub_topic: costmap_obstacles
+    marker_pub_topic: dynamic_marker
+    curtain_pub_topic: curtain
+    warnings_pub_topic: warnings
