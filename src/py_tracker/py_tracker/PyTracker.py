@@ -95,6 +95,10 @@ class PyTracker(Node):
             10
         )
 
+        #Setup for finding robot position
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+
     def update_parameters(self, _):
         self.dynamic_movement_speed = self.get_parameter("dynamic_movement_speed").get_parameter_value().double_value
         self.dynamic_time_threshold = self.get_parameter("dynamic_time_threshold").get_parameter_value().double_value
