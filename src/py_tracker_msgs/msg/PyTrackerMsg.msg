@@ -17,4 +17,4 @@ string frame_id
 bool is_dynamic 
 
 #Time stamp at creation, (could be time timestamp)
-time time_created
+builtin_interfaces/Time time_created
