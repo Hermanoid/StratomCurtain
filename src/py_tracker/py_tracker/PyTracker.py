@@ -87,13 +87,13 @@ class PyTracker(Node):
         self.poly_pub = None
         self.poly_timer = None
         self.marker_pub = None
+        self.warnings_pub = None
 
         self.update_parameters(None)
         self.add_on_set_parameters_callback(self.update_parameters)
 
         # Setup for finding robot position
         self.tf_buffer = Buffer()
-
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
     def update_parameters(self, _):
