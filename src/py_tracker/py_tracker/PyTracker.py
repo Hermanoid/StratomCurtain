@@ -1,6 +1,6 @@
 import rclpy
 from enum import Enum
-from shapely import Polygon
+from shapely import Polygon, Point
 import numpy as np
 from rclpy.node import Node
 from rclpy.time import Duration
@@ -163,9 +163,9 @@ class PyTracker(Node):
             if value.polygon.intersects(self.curtain_boundary):
                 cur_obs = PyTrackerMsg()
                 cur_obs.object_id = key
-                cur_obs.min_angle = self.get_min_angle(self, value.polygon)
-                cur_obs.max_angle = self.get_max_angle(self, value.polygon)
-                cur_obs.distance = value.polygon.distance(self.robot_x, self.robot_y)
+                cur_obs.min_angle = self.get_min_angle(value.polygon)
+                cur_obs.max_angle = self.get_max_angle(value.polygon)
+                cur_obs.distance = value.polygon.distance(Point(self.robot_x, self.robot_y))
                 # cur_obs.timestamp =
                 # cur_obs.frame_id =
                 cur_obs.is_dynamic = value.isDynamic
@@ -384,11 +384,11 @@ class PyTracker(Node):
             marker_array.markers.append(marker)
         self.marker_pub.publish(marker_array)
 
-    def get_angles(self, polygon):
+    def get_angles(self, polygon: Polygon):
         angles = []
-        for p in polygon:
-            ydiff = p.y - self.robot_y
-            xdiff = p.x - self.robot_x
+        for p in polygon.exterior.coords:
+            ydiff = p[1] - self.robot_y
+            xdiff = p[0] - self.robot_x
             angle = math.degrees(math.atan(ydiff / xdiff))
             angles.append(angle)
         return angles
