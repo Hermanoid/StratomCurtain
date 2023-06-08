@@ -3,7 +3,7 @@ from enum import Enum
 from shapely import Polygon, Point
 import numpy as np
 from rclpy.node import Node
-from rclpy.time import Duration
+from rclpy.time import Duration, Time
 from collections import OrderedDict
 from costmap_converter_msgs.msg import ObstacleArrayMsg, ObstacleMsg
 from rcl_interfaces.msg import SetParametersResult
@@ -37,15 +37,15 @@ class TrackState(Enum):
 
 
 class TrackedObject:
-    def __init__(self, polygon: Polygon):
+    def __init__(self, polygon: Polygon, stamp: Time):
         self.polygon: Polygon = polygon
         self.disappearedFrames = 0
         self.state: TrackState = TrackState.Static
         self.stateStartTime = None
         self.lastTrackedTime = None
+        self.initializedTime = stamp
         self.isDynamic = False
         self.velocity_rolling = np.array((0, 0))
-        self.initializedTime = None
 
     def updateState(self, newState: TrackState, nowtime):
         self.state = newState
@@ -148,8 +148,7 @@ class PyTracker(Node):
 
     # Creates a unique ID for a polygon
     def register(self, polygon, header: Header):
-        self.objects[self.nextObjectID] = TrackedObject(polygon)
-        self.objects[self.nextObjectID].initializedTime = header.stamp.sec + header.stamp.nanosec / 1000000000.0
+        self.objects[self.nextObjectID] = TrackedObject(polygon, Time.from_msg(header.stamp))
         self.nextObjectID += 1
 
     # Removes a polygon from list of tracked polygons
@@ -166,7 +165,7 @@ class PyTracker(Node):
                 cur_obs.min_angle = self.get_min_angle(value.polygon)
                 cur_obs.max_angle = self.get_max_angle(value.polygon)
                 cur_obs.distance = value.polygon.distance(Point(self.robot_x, self.robot_y))
-                # cur_obs.timestamp =
+                cur_obs.time_created = Time.to_msg(value.initializedTime)
                 # cur_obs.frame_id =
                 cur_obs.is_dynamic = value.isDynamic
 

@@ -10,9 +10,6 @@ float32 max_angle
 #Distance to polygon
 float32 distance
 
-#Time stamp, (could be time timestamp)
-builtin_interfaces/Time stamp
-
 #Frame ID
 string frame_id 
 
