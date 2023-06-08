@@ -3,14 +3,16 @@ from enum import Enum
 from shapely import Polygon
 import numpy as np
 from rclpy.node import Node
+from rclpy.time import Duration
 from collections import OrderedDict
 from costmap_converter_msgs.msg import ObstacleArrayMsg, ObstacleMsg
 from rcl_interfaces.msg import SetParametersResult
 from tf2_ros.transform_listener import TransformListener
 from tf2_ros.buffer import Buffer
+from tf2_ros import LookupException
 import math
 
-# from py_tracker_msg import PyTrackerArrayMsg, PyTrackerMsg
+from py_tracker_msgs.msg import PyTrackerArrayMsg, PyTrackerMsg
 from scipy.spatial import distance as dist
 from typing import List
 import cv2
@@ -22,8 +24,6 @@ from rcl_interfaces.msg import SetParametersResult
 from geometry_msgs.msg import Polygon as PolygonMsg
 from geometry_msgs.msg import Point32
 from visualization_msgs.msg import Marker, MarkerArray
-
-# from py_tracker_msg import PyTrackerArrayMsg, PyTrackerMsg
 
 VIZ_PIXELS_PER_METER = 20
 VIZ_FRAME_SIZE = 350
@@ -81,18 +81,17 @@ class PyTracker(Node):
         self.declare_parameter("curtain_boundary", [0.0, 10.0, -10.0, -10.0, 10.0, -10.0])
         self.declare_parameter("curtain_publish_period", 1.0)
 
-        self.poly_pub = self.create_publisher(PolygonMsg, "curtain", 1)
+        self.declare_parameter("marker_topic", "dynamic_marker")
+        self.declare_parameter("curtain_topic", "curtain")
+        self.declare_parameter("warnings_topic", "warnings")
+
+        self.poly_pub = None
         self.poly_timer = None
+        self.marker_pub = None
+        self.warnings_pub = None
 
         self.update_parameters(None)
         self.add_on_set_parameters_callback(self.update_parameters)
-        # Create a publisher to a topic (be able to change topic name?)
-        # self.publisher_ = self.create_publisher(
-        #     PyTrackerArrayMsg,
-        #     'warning_messages',
-        #     10
-        # )
-        self.marker_publisher_ = self.create_publisher(MarkerArray, "dynamic_obsticle_marker", 10)
 
         # Setup for finding robot position
         self.tf_buffer = Buffer()
@@ -112,10 +111,29 @@ class PyTracker(Node):
         # Grab the updated curtain publish rate, destroy the old timer, and create a new one with the new rate.
         # ROS does not allow changing the period of an preexisting timer.
         pub_rate = self.get_parameter("curtain_publish_period").get_parameter_value().double_value
-        if self.poly_timer:
-            self.poly_timer.destroy()
-        self.poly_timer = self.create_timer(pub_rate, self.publish_curtain)
+        if pub_rate != self.poly_timer.timer_period_ns / 1000000000.0:
+            if self.poly_timer:
+                self.poly_timer.destroy()
+            self.poly_timer = self.create_timer(pub_rate, self.publish_curtain)
+
+        self.poly_pub = self.update_publisher(self.poly_pub, PolygonMsg, "curtain_topic", 1)
+        self.marker_pub = self.update_publisher(self.marker_pub, MarkerArray, "marker_topic", 10)
+        self.warnings_pub = self.update_publisher(self.warnings_pub, PyTrackerArrayMsg, "warnings_topic", 10)
         return SetParametersResult(successful=True)
+
+    """
+        Similar to the timer object, ROS does not allow changing the topic of publishers on existinig publisher objects
+        Thus, we need to destroy the old object and create it anew
+    """
+
+    def update_publisher(self, publisher, type, parameter, qos):
+        new_topic_name = self.get_parameter(parameter).get_parameter_value().string_value
+        if new_topic_name != publisher.topic:
+            if publisher:
+                publisher.destroy()
+            return self.create_publisher(type, new_topic_name, qos)
+        else:
+            return publisher
 
     def publish_curtain(self):
         # This one-line lad converters each point of the (exterior of the) curtain polygon into Point32 messages,
@@ -133,22 +151,31 @@ class PyTracker(Node):
     def deregister(self, objectID):
         del self.objects[objectID]
 
-    # create individual objects, add to message array. Update parameters as needed CHECK!
-    # def create_object_msg(self):
-    #     cur_object = PyTrackerMsg()
-    #     # populate object fields ...
-    #     # Add object to msg array
-    #     self.msg.warnings.append(cur_object)
+    # create & publish object warning array
+    def create_pytracker_msg(self):
+        warning_array = PyTrackerArrayMsg()
+        for key, value in self.objects.items():
+            if value.polygon.intersects(self.curtain_boundary):
+                cur_obs = PyTrackerMsg()
+                cur_obs.object_id = key
+                cur_obs.min_angle = self.get_min_angle(self, value.polygon)
+                cur_obs.max_angle = self.get_max_angle(self, value.polygon)
+                # cur_obs.timestamp =
+                # cur_obs.frame_id =
+                cur_obs.is_dynamic = value.isDynamic
 
-    # Called seperately to publish entire array to topic '/warning_messages' CHECK!
-    def publish(self):
-        self.publisher_.publish(self.msg)
+                # Add object to msg array ?
+                warning_array.warnings.append(cur_obs)
+        self.warnings_pub.publish(warning_array)
 
     def update(self, inputPolygons: List[Polygon], msg: ObstacleArrayMsg):
         # Grab position of robot on map
-        t = self.tf_buffer.lookup_transform("map", "base_link", rclpy.time.Time())
-        self.robot_x = t.translation.x
-        self.robot_y = t.translation.y
+        try:
+            t = self.tf_buffer.lookup_transform("map", "base_link", rclpy.time.Time(), timeout=Duration(seconds=1))
+        except LookupException:
+            self.get_logger().warning("PyTrakcer timed out waiting for robot transform", throttle_duration_sec=5)
+        self.robot_x = t.transform.translation.x
+        self.robot_y = t.transform.translation.y
         # If no polygons come in, start dissapearing all tracks
         if len(inputPolygons) == 0:
             for objectID in list(self.objects.keys()):
@@ -346,7 +373,7 @@ class PyTracker(Node):
             marker.pose.position.z = 0.0
             # self.marker_publisher_.publish(marker)
             marker_array.markers.append(marker)
-        self.marker_publisher_.publish(marker_array)
+        self.marker_pub.publish(marker_array)
 
     def get_angles(self, polygon):
         angles = []

@@ -8,13 +8,13 @@ float32 min_angle
 float32 max_angle
 
 #Time stamp, (could be time timestamp)
-time stamp
+builtin_interfaces/Time stamp
 
 #Frame ID
 string frame_id 
 
 #Specifices if the object is static or dynamic 
-bool is_static 
+bool is_dynamic 
 
 #Time stamp at creation, (could be time timestamp)
 time time_created

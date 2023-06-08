@@ -25,8 +25,6 @@ def generate_launch_description():
     default_world = "World1"
     worlds_path = os.path.join(pkg_share, "worlds")
 
-    params_file = os.path.join(pkg_share, "config", "default.yaml")
-
     lc = LaunchContext()
     humble_share = "/opt/ros/humble/share"
     gazebo_env_cmd = SetEnvironmentVariable(
@@ -60,11 +58,9 @@ def generate_launch_description():
         launch_arguments={"x_pose": x_pose, "y_pose": y_pose}.items(),
     )
 
-    costmap_converter_cmd = Node(
-        package="costmap_converter", executable="standalone_converter", name="costmap_converter", output="screen", parameters=[params_file]
+    stratom_curtain_cmd = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(launch_file_dir, "stratom_curtain.launch.py"))
     )
-
-    pytracker_cmd = Node(package="py_tracker", executable="py_tracker", name="py_tracker_node")
 
     # Add the commands to the launch description
     ld = LaunchDescription()
@@ -74,8 +70,6 @@ def generate_launch_description():
     ld.add_action(load_world)
     ld.add_action(robot_state_publisher_cmd)
     ld.add_action(spawn_turtlebot_cmd)
-
-    ld.add_action(costmap_converter_cmd)
-    ld.add_action(pytracker_cmd)
+    ld.add_action(stratom_curtain_cmd)
 
     return ld
