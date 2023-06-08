@@ -107,19 +107,28 @@ class PyTracker(Node):
         # Grab the updated curtain publish rate, destroy the old timer, and create a new one with the new rate.
         # ROS does not allow changing the period of an preexisting timer.
         pub_rate = self.get_parameter("curtain_publish_period").get_parameter_value().double_value
-        if self.poly_timer:
-            self.poly_timer.destroy()
-        self.poly_timer = self.create_timer(pub_rate, self.publish_curtain)
+        if pub_rate != self.poly_timer.timer_period_ns / 1000000000.0:
+            if self.poly_timer:
+                self.poly_timer.destroy()
+            self.poly_timer = self.create_timer(pub_rate, self.publish_curtain)
 
         self.poly_pub = self.update_publisher(self.poly_pub, PolygonMsg, "curtain_topic", 1)
         self.marker_pub = self.update_publisher(self.marker_pub, MarkerArray, "marker_topic", 10)
         return SetParametersResult(successful=True)
 
+    """
+        Similar to the timer object, ROS does not allow changing the topic of publishers on existinig publisher objects
+        Thus, we need to destroy the old object and create it anew
+    """
+
     def update_publisher(self, publisher, type, parameter, qos):
         new_topic_name = self.get_parameter(parameter).get_parameter_value().string_value
-        if publisher:
-            publisher.destroy()
-        return self.create_publisher(type, new_topic_name, qos)
+        if new_topic_name != publisher.topic:
+            if publisher:
+                publisher.destroy()
+            return self.create_publisher(type, new_topic_name, qos)
+        else:
+            return publisher
 
     def publish_curtain(self):
         # This one-line lad converters each point of the (exterior of the) curtain polygon into Point32 messages,
