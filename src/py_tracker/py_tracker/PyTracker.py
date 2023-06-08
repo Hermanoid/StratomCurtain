@@ -24,6 +24,7 @@ from rcl_interfaces.msg import SetParametersResult
 from geometry_msgs.msg import Polygon as PolygonMsg
 from geometry_msgs.msg import Point32
 from visualization_msgs.msg import Marker, MarkerArray
+from std_msgs.msg import Header
 
 VIZ_PIXELS_PER_METER = 20
 VIZ_FRAME_SIZE = 350
@@ -146,9 +147,9 @@ class PyTracker(Node):
         self.poly_pub.publish(PolygonMsg(points=[Point32(x=x, y=y) for x, y, in self.curtain_boundary.exterior.coords]))
 
     # Creates a unique ID for a polygon
-    def register(self, polygon):
+    def register(self, polygon, header: Header):
         self.objects[self.nextObjectID] = TrackedObject(polygon)
-        self.objects[slef.nextObjectID] = msg.header.stamp
+        self.objects[self.nextObjectID].initializedTime = header.stamp.sec + header.stamp.nanosec / 1000000000.0
         self.nextObjectID += 1
 
     # Removes a polygon from list of tracked polygons
@@ -172,7 +173,7 @@ class PyTracker(Node):
                 warning_array.warnings.append(cur_obs)
         self.warnings_pub.publish(warning_array)
 
-    def update(self, inputPolygons: List[Polygon]):
+    def update(self, inputPolygons: List[Polygon], header: Header):
         """
         This update function runs on each frame of polygons, tracks them, detects motion, and publishes results
         """
@@ -195,7 +196,7 @@ class PyTracker(Node):
         # If we have polygons coming in and none tracked, register all new polygons
         if len(self.objects) == 0:
             for polygon in inputPolygons:
-                self.register(polygon, msg)
+                self.register(polygon, header)
         # Otherwise, start doing centroid matching
 
         else:
@@ -244,7 +245,7 @@ class PyTracker(Node):
             # Else if there were more polygons detected than tracked this frame, register the new ones
             else:
                 for col in unusedCols:
-                    self.register(inputPolygons[col], msg)
+                    self.register(inputPolygons[col], header)
 
             return self.objects
 
@@ -303,7 +304,7 @@ class PyTracker(Node):
                 continue
             polygon = Polygon(shell=points)
             polygons.append(polygon)
-        self.update(polygons, msg)
+        self.update(polygons, msg.header)
         self.visualize_tracks(polygons, bad_points)
         self.visualize_markers(msg)
 
@@ -404,8 +405,6 @@ def main(args=None):
         rclpy.spin(py_tracker_node)
     except KeyboardInterrupt:
         print("PyTracker was terminated by a KeyboardInterrupt")
-
-    rclpy.shutdown()
 
 
 if __name__ == "__main__":
