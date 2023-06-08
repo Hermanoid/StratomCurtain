@@ -1,9 +1,9 @@
 import os
-from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch import LaunchDescription, LaunchContext
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution, EnvironmentVariable
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -26,6 +26,19 @@ def generate_launch_description():
     worlds_path = os.path.join(pkg_share, "worlds")
 
     params_file = os.path.join(pkg_share, "config", "default.yaml")
+
+    lc = LaunchContext()
+    humble_share = "/opt/ros/humble/share"
+    gazebo_env_cmd = SetEnvironmentVariable(
+        name="GAZEBO_MODEL_PATH",
+        value=[
+            EnvironmentVariable("GAZEBO_MODEL_PATH", default_value="").perform(lc),
+            os.pathsep,
+            os.path.join(pkg_share, "models/turtlebot3_waffle"),
+            os.pathsep,
+            humble_share,
+        ],
+    )
 
     # Declare the launch arguments
     declare_world_cmd = DeclareLaunchArgument(
@@ -51,8 +64,11 @@ def generate_launch_description():
         package="costmap_converter", executable="standalone_converter", name="costmap_converter", output="screen", parameters=[params_file]
     )
 
+    pytracker_cmd = Node(package="py_tracker", executable="py_tracker", name="py_tracker_node")
+
     # Add the commands to the launch description
     ld = LaunchDescription()
+    ld.add_action(gazebo_env_cmd)
     ld.add_action(declare_world_cmd)
 
     ld.add_action(load_world)
@@ -60,5 +76,6 @@ def generate_launch_description():
     ld.add_action(spawn_turtlebot_cmd)
 
     ld.add_action(costmap_converter_cmd)
+    ld.add_action(pytracker_cmd)
 
     return ld

@@ -48,3 +48,18 @@ costmap_converter:
       cluster_max_pts: 250
       cluster_mind_pts: 5
       cluster_max_distance: 0.5
+
+py_tracker_node:
+  ros__parameters:
+    dynamic_memory_time: 1.2
+    dynamic_movement_speed: 0.051
+    dynamic_time_threshold: 0.6
+    velocity_update_rate: 0.2
+    curtain_publish_rate: 1.0
+    # Polygon defining the boundary of the detection curtain
+    # ROS2 is admittedly pretty dumb with array parameters, so this needs to be a dictionary.
+    curtain_boundary:
+      a: [-5.0, -5.0]
+      b: [-5.0, 5.0]
+      c: [5.0, 5.0]
+      d: [5.0, -5.0]
