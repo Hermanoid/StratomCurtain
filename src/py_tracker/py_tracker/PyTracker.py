@@ -80,29 +80,22 @@ class PyTracker(Node):
         self.declare_parameter("curtain_boundary", [0.0, 10.0, -10.0, -10.0, 10.0, -10.0])
         self.declare_parameter("curtain_publish_period", 1.0)
 
+        self.declare_parameter("marker_topic", "dynamic_marker")
+        self.declare_parameter("curtain_topic", "curtain")
+        self.declare_parameter("warnings_topic", "warnings")
+
         self.poly_pub = None
         self.poly_timer = None
         self.marker_pub = None
 
         self.update_parameters(None)
         self.add_on_set_parameters_callback(self.update_parameters)
-        # Create a publisher to a topic (be able to change topic name?)
-        self.warnings_publisher_ = self.create_publisher(
-            PyTrackerArrayMsg,
-            'warning_messages',
-            10
-        )
-        self.marker_publisher_ = self.create_publisher(
-            MarkerArray, 
-            'dynamic_obsticle_marker', 
-            10
-        )
 
-         # Setup for finding robot position
+        # Setup for finding robot position
         self.tf_buffer = Buffer()
 
         self.tf_listener = TransformListener(self.tf_buffer, self)
-        
+
     def update_parameters(self, _):
         self.dynamic_movement_speed = self.get_parameter("dynamic_movement_speed").get_parameter_value().double_value
         self.dynamic_time_threshold = self.get_parameter("dynamic_time_threshold").get_parameter_value().double_value
@@ -124,6 +117,7 @@ class PyTracker(Node):
 
         self.poly_pub = self.update_publisher(self.poly_pub, PolygonMsg, "curtain_topic", 1)
         self.marker_pub = self.update_publisher(self.marker_pub, MarkerArray, "marker_topic", 10)
+        self.warnings_pub = self.update_publisher(self.warnings_pub, PyTrackerArrayMsg, "warnings_topic", 10)
         return SetParametersResult(successful=True)
 
     """
@@ -164,13 +158,13 @@ class PyTracker(Node):
                 cur_obs.object_id = key
                 cur_obs.min_angle = self.get_min_angle(self, value.polygon)
                 cur_obs.max_angle = self.get_max_angle(self, value.polygon)
-                #cur_obs.timestamp = 
-                #cur_obs.frame_id = 
+                # cur_obs.timestamp =
+                # cur_obs.frame_id =
                 cur_obs.is_dynamic = value.isDynamic
 
                 # Add object to msg array ?
                 warning_array.warnings.append(cur_obs)
-        self.warnings_publisher_.publish(warning_array)
+        self.warnings_pub.publish(warning_array)
 
     def update(self, inputPolygons: List[Polygon]):
         # Grab position of robot on map
