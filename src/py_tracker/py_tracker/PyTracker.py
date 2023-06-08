@@ -17,6 +17,8 @@ import cv2
 
 from costmap_converter_msgs.msg import ObstacleArrayMsg, ObstacleMsg
 from rcl_interfaces.msg import SetParametersResult
+
+# Import the Polygon message type as PolygonMsg because we already have the shapely.Polygon name taken
 from geometry_msgs.msg import Polygon as PolygonMsg
 from geometry_msgs.msg import Point32
 from visualization_msgs.msg import Marker, MarkerArray
@@ -52,7 +54,7 @@ class TrackedObject:
 
 class PyTracker(Node):
     def __init__(self):
-        super().__init__("py_tracker_node", parameter_overrides=[])
+        super().__init__("py_tracker_node", parameter_overrides=[], allow_undeclared_parameters=True)
         # ID to assign to the object, dictionary to keep track of mapped objects ID to centroid, number of consecutive frames marked dissapeeared
         self.nextObjectID = 1
         self.objects: OrderedDict[int, TrackedObject] = OrderedDict()
@@ -74,10 +76,10 @@ class PyTracker(Node):
         self.declare_parameter("dynamic_memory_time", 10.0)
         # Higher values will prioritize instantaneous velocity and deprioritize the rolling average
         self.declare_parameter("velocity_update_rate", 0.2)
-        # ROS doesn't allow any complex types, including arrays of points, so we have to get creative with a dict
-        # self.declare_parameter("curtain_boundary", {"a": [0, 10], "b": [-10, -10], "c": [10, -10]})
-        self.declare_parameters("curtain_boundary", [["a", [0.0, 10.0]], ["b", [-10.0, -10.0]], ["c", [-10.0, 10.0]]])
-        self.declare_parameter("curtain_publish_rate", 1.0)
+        # ROS doesn't allow any complex types, including a nested arrays of points,
+        # so we have to get creative with a 1d array (format pt1.x, pt1.y, pt2.x, pt2.y, ....)
+        self.declare_parameter("curtain_boundary", [0.0, 10.0, -10.0, -10.0, 10.0, -10.0])
+        self.declare_parameter("curtain_publish_period", 1.0)
 
         self.poly_pub = self.create_publisher(PolygonMsg, "curtain", 1)
         self.poly_timer = None
@@ -90,13 +92,9 @@ class PyTracker(Node):
         #     'warning_messages',
         #     10
         # )
-        self.marker_publisher_ = self.create_publisher(
-            MarkerArray, 
-            'dynamic_obsticle_marker', 
-            10
-        )
+        self.marker_publisher_ = self.create_publisher(MarkerArray, "dynamic_obsticle_marker", 10)
 
-        #Setup for finding robot position
+        # Setup for finding robot position
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
@@ -106,18 +104,23 @@ class PyTracker(Node):
         self.dynamic_memory_time = self.get_parameter("dynamic_memory_time").get_parameter_value().double_value
         self.velocity_update_rate = self.get_parameter("velocity_update_rate").get_parameter_value().double_value
 
-        boundary_points = [
-            parameter.get_parameter_value().double_array for parameter in self.get_parameters_by_prefix("curtain_boundary").values()
-        ]
+        boundary_array = self.get_parameter("curtain_boundary").get_parameter_value().double_array_value
+        # This big-brain one-liner grabs every other point for x, every other point (shifted one) for y, and pairs them together
+        boundary_points = list(zip(boundary_array[::2], boundary_array[1::2]))
         self.curtain_boundary = Polygon(shell=boundary_points)
 
-        pub_rate = self.get_parameter("curtain_publish_rate").get_parameter_value().double_value
+        # Grab the updated curtain publish rate, destroy the old timer, and create a new one with the new rate.
+        # ROS does not allow changing the period of an preexisting timer.
+        pub_rate = self.get_parameter("curtain_publish_period").get_parameter_value().double_value
         if self.poly_timer:
             self.poly_timer.destroy()
         self.poly_timer = self.create_timer(pub_rate, self.publish_curtain)
         return SetParametersResult(successful=True)
 
     def publish_curtain(self):
+        # This one-line lad converters each point of the (exterior of the) curtain polygon into Point32 messages,
+        # and packages those Point32s into a geometry_msgs.msg.Polygon type
+
         self.poly_pub.publish(PolygonMsg(points=[Point32(x=x, y=y) for x, y, in self.curtain_boundary.exterior.coords]))
 
     # Creates a unique ID for a polygon
@@ -142,10 +145,11 @@ class PyTracker(Node):
         self.publisher_.publish(self.msg)
 
     def update(self, inputPolygons: List[Polygon]):
-        #Grab position of robot on map
+        # Grab position of robot on map
         t = self.tf_buffer.lookup_transform("map", "base_link", rclpy.time.Time())
         self.robot_x = t.translation.x
         self.robot_y = t.translation.y
+        # If no polygons come in, start dissapearing all tracks
         if len(inputPolygons) == 0:
             for objectID in list(self.objects.keys()):
                 self.objects[objectID].dissappearedFrames += 1
@@ -153,17 +157,22 @@ class PyTracker(Node):
                     self.deregister(objectID)
             return self.objects
 
+        # If we have polygons coming in and none tracked, register all new polygons
         if len(self.objects) == 0:
             for polygon in inputPolygons:
                 self.register(polygon, msg)
+        # Otherwise, start doing centroid matching
 
         else:
             # Attempt to associate object IDs
             objectIDs = list(self.objects.keys())
 
+            # Calculate centroids for polygons from both this frame and the last
             objectCentroids = [(obj.polygon.centroid.x, obj.polygon.centroid.y) for obj in self.objects.values()]
             inputCentroids = [(poly.centroid.x, poly.centroid.y) for poly in inputPolygons]
 
+            # This gets a 2D matrix of all distances between all centroids and basically does the Hungarian Algorithm
+            # to find the lowest-cost (lowest-distance) matching between centroids from the last frame to this frame
             D = dist.cdist(np.array(objectCentroids), np.array(inputCentroids))
             rows = D.min(axis=1).argsort()
             cols = D.argmin(axis=1)[rows]
@@ -171,14 +180,15 @@ class PyTracker(Node):
             usedRows = set()
             usedCols = set()
 
+            # Use the matching to update our tracked objects dictionary
+            # And, for each matched polygon, look for motion to detect static/dynamic
             for row, col in zip(rows, cols):
                 if row in usedRows or col in usedCols:
                     continue
 
                 objectID = objectIDs[row]
-                oldPoly = self.objects[objectID].polygon
                 newPoly = inputPolygons[col]
-                self.detect_dynamic(objectID, oldPoly, newPoly)
+                self.detect_dynamic(objectID, newPoly)
                 self.objects[objectID].polygon = newPoly
                 self.objects[objectID].dissappearedFrames = 0
 
@@ -188,6 +198,7 @@ class PyTracker(Node):
             unusedRows = set(range(0, D.shape[0])).difference(usedRows)
             unusedCols = set(range(0, D.shape[1])).difference(usedCols)
             # Deal with lost or disappeared objects
+            # If there are more polygons tracked (shape[0]) than detected (shape[1]) this frame, start dissapearing
             if D.shape[0] >= D.shape[1]:
                 for row in unusedRows:
                     objectID = objectIDs[row]
@@ -195,27 +206,42 @@ class PyTracker(Node):
 
                     if self.objects[objectID].dissappearedFrames > self.maxDisappeared:
                         self.deregister(objectID)
+            # Else if there were more polygons detected than tracked this frame, register the new ones
             else:
                 for col in unusedCols:
                     self.register(inputPolygons[col], msg)
 
             return self.objects
 
-    def detect_dynamic(self, objectID, oldPoly: Polygon, newPoly: Polygon):
+    """
+        For an object with a given object ID, look for movement between the remembered location and the 
+        provided new polygon location, do some filtering, and finally mark this object static/dynamic.
+    """
+
+    def detect_dynamic(self, objectID, newPoly: Polygon):
         nowtime = self.get_clock().now()
 
         def getElapsed(oldTime):
             return (nowtime.nanoseconds - oldTime.nanoseconds) / 1000000000.0
 
         obj = self.objects[objectID]
+        oldPoly: Polygon = obj.polygon
 
-        # if the lastTrackedTime variable has been set
+        # if the lastTrackedTime variable has been set (i.e., this isn't our first frame seeing this object)
         if obj.lastTrackedTime:
             deltatime = getElapsed(obj.lastTrackedTime)
+            # Technically, this isn't instantaneous velocity but the average velocity since the last frame
             instant_velocity = np.array((newPoly.centroid.x - oldPoly.centroid.x, newPoly.centroid.y - oldPoly.centroid.y)) / deltatime
+            # Perform a rolling average of velocity to filter out shaky back-and-forth movement
             obj.velocity_rolling = obj.velocity_rolling * (1 - self.velocity_update_rate) + instant_velocity * self.velocity_update_rate
+            # The magnitude of the (rolling average) velocity vector is speed, in m/s
             speed = np.linalg.norm(obj.velocity_rolling)
             moving = speed >= self.dynamic_movement_speed
+
+            # This state update tree handles state transitions and the time_threshold filter,
+            # which requires that an object be moving constantly for an amount of time before it becomes dynamic.
+            # Once an object becomes dynamic, it also handles switching back to static
+            #  after a specified period of not moving.
             if moving and obj.state == TrackState.Static:
                 obj.updateState(TrackState.WaitingForDynamic, nowtime)
             elif obj.state == TrackState.WaitingForDynamic:
@@ -234,7 +260,7 @@ class PyTracker(Node):
 
     def listener_callback(self, msg: ObstacleArrayMsg):
         obsArr: List[ObstacleMsg] = list(msg.obstacles)
-        # Gets the centroids and points from the polygons in the input message
+        # Gets Shapely polygons from the polygons in the input message and filters bad polygons
         polygons = []
         bad_points = []
         for obstacle in obsArr:
@@ -322,25 +348,21 @@ class PyTracker(Node):
             marker_array.markers.append(marker)
         self.marker_publisher_.publish(marker_array)
 
+    def get_angles(self, polygon):
+        angles = []
+        for p in polygon:
+            ydiff = p.y - self.robot_y
+            xdiff = p.x - self.robot_x
+            angle = math.degrees(math.atan(ydiff / xdiff))
+            angles.append(angle)
+        return angles
+
     def get_min_angle(self, polygon):
-        minangle = None
-        for p in polygon:
-            ydiff = p.y - self.robot_y
-            xdiff = p.x - self.robot_x
-            angle = math.degrees(math.atan(ydiff/xdiff))
-            if(minangle == None or angle < minangle):
-                minangle = angle
-        return minangle
-    
+        return min(self.get_angles(polygon))
+
     def get_max_angle(self, polygon):
-        maxangle = None
-        for p in polygon:
-            ydiff = p.y - self.robot_y
-            xdiff = p.x - self.robot_x
-            angle = math.degrees(math.atan(ydiff/xdiff))
-            if(maxangle == None or angle > maxangle):
-                maxangle = angle
-        return maxangle
+        return max(self.get_angles(polygon))
+
 
 def main(args=None):
     rclpy.init(args=args)
