@@ -164,6 +164,7 @@ class PyTracker(Node):
                 cur_obs.object_id = key
                 cur_obs.min_angle = self.get_min_angle(self, value.polygon)
                 cur_obs.max_angle = self.get_max_angle(self, value.polygon)
+                cur_obs.distance = value.polygon.distance(self.robot_x, self.robot_y)
                 # cur_obs.timestamp =
                 # cur_obs.frame_id =
                 cur_obs.is_dynamic = value.isDynamic
@@ -306,6 +307,7 @@ class PyTracker(Node):
         self.update(polygons, msg)
         self.visualize_tracks(polygons, bad_points)
         self.visualize_markers(msg)
+        self.create_pytracker_msg()
 
     def visualize_tracks(self, inputPolygons, bad_points):
         offset_y = offset_x = VIZ_FRAME_SIZE / 2
