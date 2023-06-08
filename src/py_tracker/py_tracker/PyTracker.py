@@ -10,7 +10,7 @@ from tf2_ros.transform_listener import TransformListener
 from tf2_ros.buffer import Buffer
 import math
 
-# from py_tracker_msg import PyTrackerArrayMsg, PyTrackerMsg
+from py_tracker_msgs.msg import PyTrackerArrayMsg, PyTrackerMsg
 from scipy.spatial import distance as dist
 from typing import List
 import cv2
@@ -20,8 +20,6 @@ from rcl_interfaces.msg import SetParametersResult
 from geometry_msgs.msg import Polygon as PolygonMsg
 from geometry_msgs.msg import Point32
 from visualization_msgs.msg import Marker, MarkerArray
-
-# from py_tracker_msg import PyTrackerArrayMsg, PyTrackerMsg
 
 VIZ_PIXELS_PER_METER = 20
 VIZ_FRAME_SIZE = 350
@@ -83,12 +81,14 @@ class PyTracker(Node):
 
         self.update_parameters(None)
         self.add_on_set_parameters_callback(self.update_parameters)
+
         # Create a publisher to a topic (be able to change topic name?)
-        # self.publisher_ = self.create_publisher(
-        #     PyTrackerArrayMsg,
-        #     'warning_messages',
-        #     10
-        # )
+        self.warnings_publisher_ = self.create_publisher(
+            PyTrackerArrayMsg,
+            'warning_messages',
+            10
+        )
+
         self.marker_publisher_ = self.create_publisher(
             MarkerArray, 
             'dynamic_obsticle_marker', 
@@ -124,16 +124,22 @@ class PyTracker(Node):
     def deregister(self, objectID):
         del self.objects[objectID]
 
-    # create individual objects, add to message array. Update parameters as needed CHECK!
-    # def create_object_msg(self):
-    #     cur_object = PyTrackerMsg()
-    #     # populate object fields ...
-    #     # Add object to msg array
-    #     self.msg.warnings.append(cur_object)
+    # create & publish object warning array
+    def create_pytracker_msg(self):
+        warning_array = PyTrackerArrayMsg()
+        for key, value in self.objects.items():
+            if value.polygon.intersects(self.curtain_boundary):
+                cur_obs = PyTrackerMsg()
+                cur_obs.object_id = key
+                cur_obs.min_angle = self.get_min_angle(self, value.polygon)
+                cur_obs.max_angle = self.get_max_angle(self, value.polygon)
+                #cur_obs.timestamp = 
+                #cur_obs.frame_id = 
+                cur_obs.is_dynamic = value.isDynamic
 
-    # Called seperately to publish entire array to topic '/warning_messages' CHECK!
-    def publish(self):
-        self.publisher_.publish(self.msg)
+                # Add object to msg array ?
+                warning_array.warnings.append(cur_obs)
+        self.warnings_publisher_.publish(warning_array)
 
     def update(self, inputPolygons: List[Polygon]):
         #Grab position of robot on map
