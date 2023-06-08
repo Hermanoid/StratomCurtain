@@ -144,7 +144,7 @@ class PyTracker(Node):
     def publish(self):
         self.publisher_.publish(self.msg)
 
-    def update(self, inputPolygons: List[Polygon]):
+    def update(self, inputPolygons: List[Polygon], msg: ObstacleArrayMsg):
         # Grab position of robot on map
         t = self.tf_buffer.lookup_transform("map", "base_link", rclpy.time.Time())
         self.robot_x = t.translation.x
