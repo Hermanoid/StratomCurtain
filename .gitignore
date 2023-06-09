@@ -5,6 +5,7 @@ build/
 install/
 bin/
 lib/
+mines_safety_curtain_bags/
 .vscode/
 msg_gen/
 srv_gen/
