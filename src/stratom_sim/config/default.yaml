@@ -21,7 +21,7 @@ converter_costmap:
         enabled: True
         observation_sources: scan
         scan:
-          topic: /scan
+          topic: /front_velodyne/scan
           max_obstacle_height: 2.0
           clearing: True
           marking: True
