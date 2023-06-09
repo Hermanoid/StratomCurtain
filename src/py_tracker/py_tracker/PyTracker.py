@@ -55,7 +55,7 @@ class TrackedObject:
 
 class PyTracker(Node):
     def __init__(self):
-        super().__init__("py_tracker_node", parameter_overrides=[], allow_undeclared_parameters=True)
+        super().__init__("py_tracker", parameter_overrides=[], allow_undeclared_parameters=True)
         # ID to assign to the object, dictionary to keep track of mapped objects ID to centroid, number of consecutive frames marked dissapeeared
         self.nextObjectID = 1
         self.objects: OrderedDict[int, TrackedObject] = OrderedDict()
@@ -125,7 +125,6 @@ class PyTracker(Node):
             if self.obstacles_sub:
                 self.obstacles_sub.destroy()
             self.obstacles_sub = self.create_subscription(ObstacleArrayMsg, obstacles_sub_topic, self.listener_callback, 10)
-        return SetParametersResult(successful=True)
 
     def update_publisher(self, publisher, type, parameter, qos):
         """
@@ -348,16 +347,19 @@ class PyTracker(Node):
     def visualize_markers(self, msg: ObstacleArrayMsg):
         increment = 1
         marker_array = MarkerArray()
+
         clear_marker = Marker()
+        clear_marker.header.stamp = msg.header.stamp
         clear_marker.id = 0
         clear_marker.action = Marker.DELETEALL
         marker_array.markers.append(clear_marker)
+
 
         for obj in self.objects.values():
             marker = Marker()
             marker.type = 3
             marker.header.stamp = msg.header.stamp
-            marker.header.frame_id = "map"
+            marker.header.frame_id = msg.header.frame_id
             marker.scale.x = 0.35
             marker.scale.y = 0.35
             marker.scale.z = 0.75
