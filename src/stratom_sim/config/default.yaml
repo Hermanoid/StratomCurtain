@@ -1,6 +1,7 @@
 converter_costmap:
   converter_costmap:
     ros__parameters:
+      use_sim_time: True
       update_frequency: 6.0
       publish_frequency: 2.0
       global_frame: odom
@@ -44,13 +45,15 @@ costmap_converter:
   #     alpha_fast: 0.6
   costmap_converter:
     ros__parameters:
+      use_sim_time: True
       converter_plugin: costmap_converter::CostmapToPolygonsDBSMCCH
       cluster_max_pts: 250
       cluster_mind_pts: 5
       cluster_max_distance: 0.5
 
-py_tracker_node:
+py_tracker:
   ros__parameters:
+    use_sim_time: True
     dynamic_memory_time: 1.2
     dynamic_movement_speed: 0.05
     dynamic_time_threshold: 0.6
