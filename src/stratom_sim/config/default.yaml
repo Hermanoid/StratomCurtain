@@ -7,9 +7,9 @@ converter_costmap:
       global_frame: odom
       robot_base_frame: base_link
       rolling_window: true
-      width: 20
-      height: 20
-      resolution: 0.1
+      width: 40
+      height: 40
+      resolution: 0.125
       robot_radius: 0.22
       plugins: ["obstacle_layer", "inflation_layer"]
       inflation_layer:
@@ -47,24 +47,37 @@ costmap_converter:
     ros__parameters:
       use_sim_time: True
       converter_plugin: costmap_converter::CostmapToPolygonsDBSMCCH
-      cluster_max_pts: 250
+      cluster_max_pts: 150
       cluster_mind_pts: 5
       cluster_max_distance: 0.5
+      convex_hull_min_pt_separation: 0.05
 
 py_tracker:
   ros__parameters:
     use_sim_time: True
-    dynamic_memory_time: 1.2
-    dynamic_movement_speed: 0.05
+    # Once a target is deemed dynamic, how long can it remain static before we switch it back that classification?
+    dynamic_memory_time: 10.0
+    # How fast must an object move to be considered dynamic? This filter is in m/s
+    # It's a coincedence that these two parameters match up
+    dynamic_movement_speed: 0.075
+    # This parameter controls the rolling velocity average. Lower values: more averaging
+    # According to the equation avg_velocity = (1 - rate) * avg_velocity + rate * current_velocity
+    velocity_update_rate: 0.075
+    # How long must an object sustain movement before it is classified as dynamic? In seconds
     dynamic_time_threshold: 0.6
-    velocity_update_rate: 0.2
-    max_disappeared_frames: 50
+    # How many frames can an object be out-of-view before we drop our track of it?
+    max_disappeared_frames: 10
+    # Period (in seconds) to publish the safety curtain polygon for viewing in RViz
     curtain_publish_period: 1.0
     # Polygon defining the boundary of the detection curtain
     # ROS2 is admittedly pretty dumb with array parameters, so this needs to be a 1D array
     # Every other number is x, then y, for each point: (x1, y1, x2, y2, ...)
     curtain_boundary: [-5.0, -5.0, -5.0, 5.0, 5.0, 5.0, 5.0, -5.0]
+    # Names for publisher/subscriber topics
     obstacles_sub_topic: costmap_obstacles
     marker_pub_topic: dynamic_marker
     curtain_pub_topic: curtain
     warnings_pub_topic: warnings
+    # TF Frames
+    base_frame: base_link
+    map_frame: odom

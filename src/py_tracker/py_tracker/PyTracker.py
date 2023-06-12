@@ -1,9 +1,11 @@
 import rclpy
 from enum import Enum
-from shapely import Polygon, Point
+from shapely import Polygon, Point, LineString
+import shapely.ops
 import numpy as np
 from rclpy.node import Node
 from rclpy.time import Duration, Time
+from rclpy.executors import ExternalShutdownException
 from collections import OrderedDict
 from costmap_converter_msgs.msg import ObstacleArrayMsg, ObstacleMsg
 from rcl_interfaces.msg import SetParametersResult
@@ -19,10 +21,11 @@ import cv2
 
 from costmap_converter_msgs.msg import ObstacleArrayMsg, ObstacleMsg
 from rcl_interfaces.msg import SetParametersResult
+import tf2_geometry_msgs
 
 # Import the Polygon message type as PolygonMsg because we already have the shapely.Polygon name taken
 from geometry_msgs.msg import Polygon as PolygonMsg
-from geometry_msgs.msg import Point32
+from geometry_msgs.msg import Point32, PolygonStamped, Vector3, Vector3Stamped
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import Header
 
@@ -73,6 +76,8 @@ class PyTracker(Node):
         self.declare_parameter("velocity_update_rate", 0.2)
         # Maximum number of frames the object can be undetectable for before getting dropped
         self.declare_parameter("max_disapeared_frames", 30)
+        # When a very small object is detected, its polygon is expanded by this amount in all directions
+        self.declare_parameter("small_object_buffer", 0.2)
         # ROS2 doesn't allow any complex types, including a nested array like [[pt1.x, pt1.y], [pt2.x, pt2.y], ...]
         # so for this polygon we have to get creative with a 1d array formatted [pt1.x, pt1.y, pt2.x, pt2.y, ...]
         self.declare_parameter("curtain_boundary", [0.0, 10.0, -10.0, -10.0, 10.0, -10.0])
@@ -82,6 +87,9 @@ class PyTracker(Node):
         self.declare_parameter("marker_pub_topic", "dynamic_marker")
         self.declare_parameter("curtain_pub_topic", "curtain")
         self.declare_parameter("warnings_pub_topic", "warnings")
+
+        self.declare_parameter("base_frame", "base_link")
+        self.declare_parameter("map_frame", "map")
 
         self.poly_timer = None
         self.poly_pub = None
@@ -101,12 +109,18 @@ class PyTracker(Node):
         self.dynamic_time_threshold = self.get_parameter("dynamic_time_threshold").get_parameter_value().double_value
         self.dynamic_memory_time = self.get_parameter("dynamic_memory_time").get_parameter_value().double_value
         self.velocity_update_rate = self.get_parameter("velocity_update_rate").get_parameter_value().double_value
-        self.max_disappeared = 50
+        self.max_disappeared = self.get_parameter("max_disapeared_frames").get_parameter_value().integer_value
+        self.small_object_buffer = self.get_parameter("small_object_buffer").get_parameter_value().double_value
+
+        self.base_frame = self.get_parameter("base_frame").get_parameter_value().string_value
+        self.map_frame = self.get_parameter("map_frame").get_parameter_value().string_value
 
         boundary_array = self.get_parameter("curtain_boundary").get_parameter_value().double_array_value
         # This big-brain one-liner grabs every other point for x, every other point (shifted one) for y, and pairs them together
         boundary_points = list(zip(boundary_array[::2], boundary_array[1::2]))
-        self.curtain_boundary = Polygon(shell=boundary_points)
+        self.curtain_boundary = Polygon(boundary_points)
+        polygon_msg = PolygonMsg(points=[Point32(x=x, y=y) for x, y in boundary_points])
+        self.curtain_msg = PolygonStamped(polygon=polygon_msg, header=Header(frame_id=self.base_frame))
 
         # Grab the updated curtain publish rate, destroy the old timer, and create a new one with the new rate.
         # ROS does not allow changing the period of an preexisting timer.
@@ -116,7 +130,7 @@ class PyTracker(Node):
                 self.poly_timer.destroy()
             self.poly_timer = self.create_timer(pub_rate, self.publish_curtain)
 
-        self.poly_pub = self.update_publisher(self.poly_pub, PolygonMsg, "curtain_pub_topic", 1)
+        self.poly_pub = self.update_publisher(self.poly_pub, PolygonStamped, "curtain_pub_topic", 1)
         self.marker_pub = self.update_publisher(self.marker_pub, MarkerArray, "marker_pub_topic", 10)
         self.warnings_pub = self.update_publisher(self.warnings_pub, PyTrackerArrayMsg, "warnings_pub_topic", 10)
 
@@ -125,6 +139,7 @@ class PyTracker(Node):
             if self.obstacles_sub:
                 self.obstacles_sub.destroy()
             self.obstacles_sub = self.create_subscription(ObstacleArrayMsg, obstacles_sub_topic, self.listener_callback, 10)
+        return SetParametersResult(successful=True)
 
     def update_publisher(self, publisher, type, parameter, qos):
         """
@@ -142,48 +157,51 @@ class PyTracker(Node):
     def publish_curtain(self):
         # This one-line lad converters each point of the (exterior of the) curtain polygon into Point32 messages,
         # and packages those Point32s into a geometry_msgs.msg.Polygon type
+        polygon_msg = self.curtain_msg
+        polygon_msg.header.stamp = self.get_clock().now().to_msg()
+        self.poly_pub.publish(polygon_msg)
 
-        self.poly_pub.publish(PolygonMsg(points=[Point32(x=x, y=y) for x, y, in self.curtain_boundary.exterior.coords]))
+    def listener_callback(self, msg: ObstacleArrayMsg):
+        obsArr: List[ObstacleMsg] = list(msg.obstacles)
+        # Gets Shapely polygons from the polygons in the input message and filters bad polygons
+        polygons = []
+        small_objects = []
+        bad_points = []
+        for obstacle in obsArr:
+            points = [(point.x, point.y) for point in obstacle.polygon.points]
+            # Small objects will often not be reported as completed (3-plus point) polygons, 
+            # but they should still be tracked. So, we buffer them to make them into polygons.
+            # Then we merge those small buffered polygons, because they often come in clumps.
+            if len(points)< 3:
+                bad_points += points
+                if len(points) == 1:
+                    polygon = Point(points[0]).buffer(self.small_object_buffer)
+                else:
+                    polygon = LineString(points).buffer(self.small_object_buffer)
+                small_objects.append(polygon)
+            else:
+                polygon = Polygon(shell=points)
+                polygons.append(polygon)
 
-    # Creates a unique ID for a polygon
-    def register(self, polygon, header: Header):
-        self.objects[self.nextObjectID] = TrackedObject(polygon, Time.from_msg(header.stamp))
-        self.nextObjectID += 1
+        # Simplify the bad geometries, because they will often have overlap
+        merged = shapely.ops.unary_union(small_objects)
+        # unary_union will return a polygon if the input can be merged to a single polygon,
+        # or a MultiPolygon if the small objects are not connected.
+        if isinstance(merged, Polygon):
+            polygons.append(merged)
+        else:
+            polygons += list(merged.geoms)
 
-    # Removes a polygon from list of tracked polygons
-    def deregister(self, objectID):
-        del self.objects[objectID]
 
-    # create & publish object warning array
-    def create_pytracker_msg(self):
-        warning_array = PyTrackerArrayMsg()
-        for key, value in self.objects.items():
-            if value.polygon.intersects(self.curtain_boundary):
-                cur_obs = PyTrackerMsg()
-                cur_obs.object_id = key
-                cur_obs.min_angle = self.get_min_angle(value.polygon)
-                cur_obs.max_angle = self.get_max_angle(value.polygon)
-                cur_obs.distance = value.polygon.distance(Point(self.robot_x, self.robot_y))
-                cur_obs.time_created = Time.to_msg(value.initializedTime)
-                # cur_obs.frame_id =
-                cur_obs.is_dynamic = value.isDynamic
-
-                # Add object to msg array ?
-                warning_array.warnings.append(cur_obs)
-        self.warnings_pub.publish(warning_array)
+        self.update(polygons, msg.header)
+        self.create_pytracker_msg(msg.header)
+        self.visualize_tracks(polygons, bad_points)
+        self.visualize_markers(msg)
 
     def update(self, inputPolygons: List[Polygon], header: Header):
         """
         This update function runs on each frame of polygons, tracks them, detects motion, and publishes results
         """
-        # Grab position of robot on map
-        try:
-            t = self.tf_buffer.lookup_transform("map", "base_link", rclpy.time.Time(), timeout=Duration(seconds=1))
-        except TransformException as e:
-            self.get_logger().warning("PyTracker failed to get robot transform: " + str(e), throttle_duration_sec=5)
-            return
-        self.robot_x = t.transform.translation.x
-        self.robot_y = t.transform.translation.y
         # If no polygons come in, start dissapearing all tracks
         if len(inputPolygons) == 0:
             for objectID in list(self.objects.keys()):
@@ -248,6 +266,15 @@ class PyTracker(Node):
 
             return self.objects
 
+    # Creates a unique ID for a polygon
+    def register(self, polygon, header: Header):
+        self.objects[self.nextObjectID] = TrackedObject(polygon, Time.from_msg(header.stamp))
+        self.nextObjectID += 1
+
+    # Removes a polygon from list of tracked polygons
+    def deregister(self, objectID):
+        del self.objects[objectID]
+
     def detect_dynamic(self, objectID, newPoly: Polygon):
         """
         For an object with a given object ID, look for movement between the remembered location and the
@@ -291,22 +318,40 @@ class PyTracker(Node):
 
         obj.lastTrackedTime = nowtime
 
-    def listener_callback(self, msg: ObstacleArrayMsg):
-        obsArr: List[ObstacleMsg] = list(msg.obstacles)
-        # Gets Shapely polygons from the polygons in the input message and filters bad polygons
-        polygons = []
-        bad_points = []
-        for obstacle in obsArr:
-            points = [(point.x, point.y) for point in obstacle.polygon.points]
-            if len(points) < 3:
-                bad_points += points
-                continue
-            polygon = Polygon(shell=points)
-            polygons.append(polygon)
-        self.update(polygons, msg.header)
-        self.visualize_tracks(polygons, bad_points)
-        self.visualize_markers(msg)
-        self.create_pytracker_msg()
+    # create & publish object warning array
+    def create_pytracker_msg(self, header: Header):
+        # Grab position of robot on map
+        try:
+            t = self.tf_buffer.lookup_transform(self.map_frame, self.base_frame, rclpy.time.Time.from_msg(header.stamp), timeout=Duration(seconds=1))
+        except TransformException as e:
+            self.get_logger().warning("PyTracker failed to get robot transform: " + str(e), throttle_duration_sec=5)
+            return
+        self.robot_x = t.transform.translation.x
+        self.robot_y = t.transform.translation.y
+        # Transform polygon to robot frame for filtering publications
+        curtain_msg = self.curtain_msg
+        curtain_msg.header.stamp = header.stamp
+        curtain_in_map:PolygonStamped = self.transform_polygon(curtain_msg, self.map_frame)
+        curtain_poly = Polygon([(point.x, point.y) for point in curtain_in_map.polygon.points])
+        
+        # Put together warnings array, filtering tracked objects by curtain
+        # Alsos transform format from cartesian to polar per project requirements
+        warning_array = PyTrackerArrayMsg()
+        warning_array.header = header
+        for key, value in self.objects.items():
+            if value.polygon.intersects(curtain_poly):
+                cur_obs = PyTrackerMsg()
+                cur_obs.object_id = key
+                cur_obs.min_angle = self.get_min_angle(value.polygon)
+                cur_obs.max_angle = self.get_max_angle(value.polygon)
+                cur_obs.distance = value.polygon.distance(Point(self.robot_x, self.robot_y))
+                cur_obs.time_created = Time.to_msg(value.initializedTime)
+                # cur_obs.frame_id =
+                cur_obs.is_dynamic = value.isDynamic
+
+                # Add object to msg array ?
+                warning_array.warnings.append(cur_obs)
+        self.warnings_pub.publish(warning_array)
 
     def visualize_tracks(self, inputPolygons, bad_points):
         offset_y = offset_x = VIZ_FRAME_SIZE / 2
@@ -347,9 +392,8 @@ class PyTracker(Node):
     def visualize_markers(self, msg: ObstacleArrayMsg):
         increment = 1
         marker_array = MarkerArray()
-
         clear_marker = Marker()
-        clear_marker.header.stamp = msg.header.stamp
+        clear_marker.header = msg.header
         clear_marker.id = 0
         clear_marker.action = Marker.DELETEALL
         marker_array.markers.append(clear_marker)
@@ -360,8 +404,7 @@ class PyTracker(Node):
                 continue
             marker = Marker()
             marker.type = 3
-            marker.header.stamp = msg.header.stamp
-            marker.header.frame_id = msg.header.frame_id
+            marker.header = msg.header
             marker.scale.x = 0.35
             marker.scale.y = 0.35
             marker.scale.z = 0.75
@@ -401,14 +444,23 @@ class PyTracker(Node):
     def get_max_angle(self, polygon):
         return max(self.get_angles(polygon))
 
+    def transform_polygon(self, polygon: PolygonStamped, frame:str):
+        """
+            tf2 doesn't yet support transformations of polygons, so we have to transform each point individually
+        """
+        points = polygon.polygon.points
+        vector3s = [Vector3Stamped(vector=Vector3(x=point.x, y=point.y, z=0.0), header=polygon.header) for point in points]
+        transformed_vectors = [self.tf_buffer.transform(vector3, frame) for vector3 in vector3s]
+        transformed_points = [Point32(x=vector3.vector.x, y=vector3.vector.y) for vector3 in transformed_vectors]
+        return PolygonStamped(polygon=PolygonMsg(points=transformed_points), header=polygon.header)
 
 def main(args=None):
     rclpy.init(args=args)
     try:
         py_tracker_node = PyTracker()
         rclpy.spin(py_tracker_node)
-    except KeyboardInterrupt:
-        print("PyTracker was terminated by a KeyboardInterrupt")
+    except (KeyboardInterrupt, ExternalShutdownException):
+        print("PyTracker was terminated by the user.")
 
 
 if __name__ == "__main__":

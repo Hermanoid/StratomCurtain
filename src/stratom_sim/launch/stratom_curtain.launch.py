@@ -15,7 +15,7 @@ def generate_launch_description():
         remappings=[("/scan", "/front_velodyne/scan")]
     )
 
-    pytracker_cmd = Node(package="py_tracker", executable="py_tracker", name="py_tracker_node", parameters=[])
+    pytracker_cmd = Node(package="py_tracker", executable="py_tracker", name="py_tracker", parameters=[params_file])
 
     # Add the commands to the launch description
     ld = LaunchDescription()
