@@ -21,8 +21,15 @@ Converts odometry information to a Tf message.
 
 
 # Build
-1. Create a Docker image and container from the Dockerfile or get all of the dependencies it lists.
-2. Go to the directory containing the src folder and run colcon build.
+This was build for a docker container running on a Windows computer.
+1. Install docker: https://docs.docker.com/desktop/install/windows-install/
+2. Update WSL: wsl –update
+3. Open powershell and go to the directory you want to download the repository
+4. Run the command \<Command\>
+5. Go into the directory
+6. Buiold the image with the command: docker build -t \<Image_name\> .
+7. Create a container from the image with the command: docker run -it --net host --ipc host --gpus=all --privileged -v C:\<path>\<to>\<folder>:/home/mines/mines_ws --name \<Container_name\> \<Image_name\>
+8. Run colcon build
 
 
 # Usage
