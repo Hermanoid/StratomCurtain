@@ -29,6 +29,7 @@ from geometry_msgs.msg import Point32, PolygonStamped, Vector3, Vector3Stamped
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import Header
 
+ENABLE_VIZ = False
 VIZ_PIXELS_PER_METER = 20
 VIZ_FRAME_SIZE = 350
 
@@ -103,6 +104,7 @@ class PyTracker(Node):
         # Setup for finding robot position
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.get_logger().info("py_tracker ready!")
 
     def update_parameters(self, _):
         self.dynamic_movement_speed = self.get_parameter("dynamic_movement_speed").get_parameter_value().double_value
@@ -169,10 +171,10 @@ class PyTracker(Node):
         bad_points = []
         for obstacle in obsArr:
             points = [(point.x, point.y) for point in obstacle.polygon.points]
-            # Small objects will often not be reported as completed (3-plus point) polygons, 
+            # Small objects will often not be reported as completed (3-plus point) polygons,
             # but they should still be tracked. So, we buffer them to make them into polygons.
             # Then we merge those small buffered polygons, because they often come in clumps.
-            if len(points)< 3:
+            if len(points) < 3:
                 bad_points += points
                 if len(points) == 1:
                     polygon = Point(points[0]).buffer(self.small_object_buffer)
@@ -192,10 +194,10 @@ class PyTracker(Node):
         else:
             polygons += list(merged.geoms)
 
-
         self.update(polygons, msg.header)
-        self.create_pytracker_msg(msg.header)
-        self.visualize_tracks(polygons, bad_points)
+        # self.create_pytracker_msg(msg.header)
+        if ENABLE_VIZ:
+            self.visualize_tracks(polygons, bad_points)
         self.visualize_markers(msg)
 
     def update(self, inputPolygons: List[Polygon], header: Header):
@@ -322,7 +324,9 @@ class PyTracker(Node):
     def create_pytracker_msg(self, header: Header):
         # Grab position of robot on map
         try:
-            t = self.tf_buffer.lookup_transform(self.map_frame, self.base_frame, rclpy.time.Time.from_msg(header.stamp), timeout=Duration(seconds=1))
+            t = self.tf_buffer.lookup_transform(
+                self.map_frame, self.base_frame, rclpy.time.Time.from_msg(header.stamp), timeout=Duration(seconds=1)
+            )
         except TransformException as e:
             self.get_logger().warning("PyTracker failed to get robot transform: " + str(e), throttle_duration_sec=5)
             return
@@ -331,9 +335,10 @@ class PyTracker(Node):
         # Transform polygon to robot frame for filtering publications
         curtain_msg = self.curtain_msg
         curtain_msg.header.stamp = header.stamp
-        curtain_in_map:PolygonStamped = self.transform_polygon(curtain_msg, self.map_frame)
+        curtain_in_map = curtain_msg  # Temporarily remove this transform for performance testing
+        # curtain_in_map:PolygonStamped = self.transform_polygon(curtain_msg, self.map_frame)
         curtain_poly = Polygon([(point.x, point.y) for point in curtain_in_map.polygon.points])
-        
+
         # Put together warnings array, filtering tracked objects by curtain
         # Alsos transform format from cartesian to polar per project requirements
         warning_array = PyTrackerArrayMsg()
@@ -398,7 +403,6 @@ class PyTracker(Node):
         clear_marker.action = Marker.DELETEALL
         marker_array.markers.append(clear_marker)
 
-
         for obj in self.objects.values():
             if obj.disappearedFrames >= 1:
                 continue
@@ -444,15 +448,16 @@ class PyTracker(Node):
     def get_max_angle(self, polygon):
         return max(self.get_angles(polygon))
 
-    def transform_polygon(self, polygon: PolygonStamped, frame:str):
+    def transform_polygon(self, polygon: PolygonStamped, frame: str):
         """
-            tf2 doesn't yet support transformations of polygons, so we have to transform each point individually
+        tf2 doesn't yet support transformations of polygons, so we have to transform each point individually
         """
         points = polygon.polygon.points
         vector3s = [Vector3Stamped(vector=Vector3(x=point.x, y=point.y, z=0.0), header=polygon.header) for point in points]
         transformed_vectors = [self.tf_buffer.transform(vector3, frame) for vector3 in vector3s]
         transformed_points = [Point32(x=vector3.vector.x, y=vector3.vector.y) for vector3 in transformed_vectors]
         return PolygonStamped(polygon=PolygonMsg(points=transformed_points), header=polygon.header)
+
 
 def main(args=None):
     rclpy.init(args=args)

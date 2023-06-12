@@ -58,13 +58,12 @@ py_tracker:
     # Once a target is deemed dynamic, how long can it remain static before we switch it back that classification?
     dynamic_memory_time: 10.0
     # How fast must an object move to be considered dynamic? This filter is in m/s
-    # It's a coincedence that these two parameters match up
-    dynamic_movement_speed: 0.075
+    dynamic_movement_speed: 0.06
     # This parameter controls the rolling velocity average. Lower values: more averaging
-    # According to the equation avg_velocity = (1 - rate) * avg_velocity + rate * current_velocity
+    # According to the equation (each frame) avg_velocity = (1 - rate) * avg_velocity + rate * current_velocity
     velocity_update_rate: 0.075
     # How long must an object sustain movement before it is classified as dynamic? In seconds
-    dynamic_time_threshold: 0.6
+    dynamic_time_threshold: 0.5
     # How many frames can an object be out-of-view before we drop our track of it?
     max_disappeared_frames: 10
     # Period (in seconds) to publish the safety curtain polygon for viewing in RViz
