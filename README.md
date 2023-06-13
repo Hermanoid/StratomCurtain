@@ -27,13 +27,14 @@ This was build for a docker container running on a Windows computer.
 4. Open powershell to the directory you want to install the git repository
 5. Run the command \<git clone --recurse-submodules https://github.com/Hermanoid/StratomCurtain.git \>
 6. Go into the directory
-7. Build the image with the command: docker build -t \<image_name\> .
-8. Create a container from the image with the command: docker run -it --net host --ipc host --gpus=all --privileged -v C:\\\<path\>\\<to\>\\\<folder\>:/home/mines/mines_ws --name \<container_name\> \<image_name\>
-9. Run: colcon build
-10. Run: source /opt/ros/humble/setup.bash 
-11. Run: source install/setup.bash 
-12. Download and install XLaunch
-13. Run XLaunch with default settings
+7. Run and sign into Docker Desktop
+8. Build the image with the command: docker build -t \<image_name\> .
+9. Create a container from the image with the command: docker run -it --net host --ipc host --gpus=all --privileged -v C:\\\<path\>\\<to\>\\\<repository\>:/home/mines/mines_ws --name \<container_name\> \<image_name\>
+10. Run: colcon build
+11. Run: source /opt/ros/humble/setup.bash 
+12. Run: source install/setup.bash 
+13. Download and install XLaunch: https://sourceforge.net/projects/vcxsrv/
+14. Run XLaunch with default settings
 
 
 # Usage
@@ -43,6 +44,8 @@ This was build for a docker container running on a Windows computer.
     world:=World1
 * ros2 launch stratom_sim stratom_curtain.launch.py<br>
     Launches all nodes needed to read from a lidar scan and odemetry and output warning messages
+### Parameters
+Parameters can be found in src/stratom_sim/config/default.yaml
 
 # License:
 The py_tracker, statom_sim, and odom_tf2_adapter packages are under the MIT licence
