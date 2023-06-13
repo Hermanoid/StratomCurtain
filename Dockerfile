@@ -38,7 +38,7 @@ WORKDIR "/home/mines/mines_ws"
 ENV DISPLAY=host.docker.internal:0.0
 
 # Copy in the bashrc file for convenience functions
-COPY .bashrc /home/mines/.bashrc
+# COPY .bashrc /home/mines/.bashrc
 
 # Since the workdir is already set to the volume with repo files, no need to copy those in.
 # Just build the workspace
