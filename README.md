@@ -21,8 +21,20 @@ Converts odometry information to a Tf message.
 
 
 # Build
-1. Create a Docker image and container from the Dockerfile or get all of the dependencies it lists.
-2. Go to the directory containing the src folder and run colcon build.
+This was build for a docker container running on a Windows computer.
+1. Download and install Docker: https://docs.docker.com/desktop/install/windows-install/
+3. Open powershell and update WSL: wsl --update
+4. Open powershell to the directory you want to install the git repository
+5. Run the command \<git clone --recurse-submodules https://github.com/Hermanoid/StratomCurtain.git \>
+6. Go into the directory
+7. Run and sign into Docker Desktop
+8. Build the image with the command: docker build -t \<image_name\> .
+9. Create a container from the image with the command: docker run -it --net host --ipc host --gpus=all --privileged -v C:\\\<path\>\\<to\>\\\<repository\>:/home/mines/mines_ws --name \<container_name\> \<image_name\>
+10. Run: colcon build
+11. Run: source /opt/ros/humble/setup.bash 
+12. Run: source install/setup.bash 
+13. Download and install XLaunch: https://sourceforge.net/projects/vcxsrv/
+14. Run XLaunch with default settings
 
 
 # Usage
@@ -32,6 +44,8 @@ Converts odometry information to a Tf message.
     world:=World1
 * ros2 launch stratom_sim stratom_curtain.launch.py<br>
     Launches all nodes needed to read from a lidar scan and odemetry and output warning messages
+### Parameters
+Parameters can be found in src/stratom_sim/config/default.yaml
 
 # License:
 The py_tracker, statom_sim, and odom_tf2_adapter packages are under the MIT licence
