@@ -22,14 +22,18 @@ Converts odometry information to a Tf message.
 
 # Build
 This was build for a docker container running on a Windows computer.
-1. Install docker: https://docs.docker.com/desktop/install/windows-install/
-2. Update WSL: wsl –update
-3. Open powershell and go to the directory you want to download the repository
-4. Run the command \<Command\>
-5. Go into the directory
-6. Buiold the image with the command: docker build -t \<Image_name\> .
-7. Create a container from the image with the command: docker run -it --net host --ipc host --gpus=all --privileged -v C:\<path>\<to>\<folder>:/home/mines/mines_ws --name \<Container_name\> \<Image_name\>
-8. Run colcon build
+1. Download and install Docker: https://docs.docker.com/desktop/install/windows-install/
+3. Open powershell and update WSL: wsl --update
+4. Open powershell to the directory you want to install the git repository
+5. Run the command \<git clone --recursive-submodules https://github.com/Hermanoid/StratomCurtain.git \>
+6. Go into the directory
+7. Build the image with the command: docker build -t \<image_name\> .
+8. Create a container from the image with the command: docker run -it --net host --ipc host --gpus=all --privileged -v C:\\\<path\>\\<to\>\\\<folder\>:/home/mines/mines_ws --name \<container_name\> \<image_name\>
+9. Run: colcon build
+10. Run: source /opt/ros/humble/setup.bash 
+11. Run: source install/setup.bash 
+12. Download and install XLaunch
+13. Run XLaunch with default settings
 
 
 # Usage
