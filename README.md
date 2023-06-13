@@ -25,7 +25,7 @@ This was build for a docker container running on a Windows computer.
 1. Download and install Docker: https://docs.docker.com/desktop/install/windows-install/
 3. Open powershell and update WSL: wsl --update
 4. Open powershell to the directory you want to install the git repository
-5. Run the command \<git clone --recursive-submodules https://github.com/Hermanoid/StratomCurtain.git \>
+5. Run the command \<git clone --recurse-submodules https://github.com/Hermanoid/StratomCurtain.git \>
 6. Go into the directory
 7. Build the image with the command: docker build -t \<image_name\> .
 8. Create a container from the image with the command: docker run -it --net host --ipc host --gpus=all --privileged -v C:\\\<path\>\\<to\>\\\<folder\>:/home/mines/mines_ws --name \<container_name\> \<image_name\>
