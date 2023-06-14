@@ -43,14 +43,18 @@ costmap_converter:
   #     min_distance_between_blobs: 100
   #     alpha_slow: 0.1
   #     alpha_fast: 0.6
-  costmap_converter:
-    ros__parameters:
-      use_sim_time: True
-      converter_plugin: costmap_converter::CostmapToPolygonsDBSMCCH
-      cluster_max_pts: 150
-      cluster_mind_pts: 5
-      cluster_max_distance: 0.5
-      convex_hull_min_pt_separation: 0.05
+  ros__parameters:
+    # converter_plugin: costmap_converter::CostmapToPolygonsDBSMCCH
+    converter_plugin: costmap_converter::CostmapToPolygonsDBSConcaveHull
+    use_sim_time: True
+/costmap_converter/costmap_converter:
+  ros__parameters:
+    use_sim_time: True
+    cluster_max_pts: 150
+    cluster_mind_pts: 5
+    cluster_max_distance: 0.5
+    convex_hull_min_pt_separation: 0.05
+
 
 py_tracker:
   ros__parameters:
