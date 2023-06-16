@@ -18,7 +18,8 @@ def generate_launch_description():
 
     rviz_cmd = Node(
         package='rviz2', namespace='', executable='rviz2', name='rviz2',
-         arguments=['-d' + os.path.join(pkg_share, 'config', 'rviz_config.rviz') ]
+         arguments=['-d',  os.path.join(pkg_share, 'rviz', 'default.rviz') ],
+         parameters=[params_file]
         )
     # Add the commands to the launch description
     ld = LaunchDescription()

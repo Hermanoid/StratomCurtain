@@ -28,6 +28,7 @@ install(DIRECTORY launch
   worlds
   # robots
   # components
+  rviz
   models
   DESTINATION share/${PROJECT_NAME})
 
